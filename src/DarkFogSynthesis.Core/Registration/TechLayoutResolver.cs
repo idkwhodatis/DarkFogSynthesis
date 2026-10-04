@@ -65,6 +65,21 @@ namespace DarkFogSynthesis.Core.Registration
     /// <summary>Single resolver for our two nodes. No guessed footprint sizes or reflow of vanilla nodes.</summary>
     public static class TechLayoutResolver
     {
+        /// <summary>
+        /// Detects exact anchor conflicts on the main technology page, including not-yet-inserted prototypes
+        /// supplied by the caller. Upgrade-page coordinates use a different canvas. This is not a measured
+        /// normal/hover/expanded bounds check and must not be advertised as a verified layout.
+        /// </summary>
+        public static IReadOnlyList<TechId> FindMainTreeAnchorCollisions(TechId proposedTech, TechPosition proposedPosition,
+            IEnumerable<KeyValuePair<TechId, TechPosition>> existing)
+        {
+            if (proposedTech.Value <= 0 || proposedTech.Value > 2000)
+                throw new ArgumentOutOfRangeException(nameof(proposedTech), "A main-page technology ID (1..2000) is required.");
+            if (existing == null) throw new ArgumentNullException(nameof(existing));
+            return FrozenList.Copy(existing.Where(entry => entry.Key != proposedTech && entry.Key.Value > 0 && entry.Key.Value <= 2000
+                && entry.Value.Equals(proposedPosition)).Select(entry => entry.Key).Distinct().OrderBy(id => id.Value));
+        }
+
         public static TechLayoutResolution Resolve(string gameVersion)
         {
             if (string.IsNullOrWhiteSpace(gameVersion)) throw new ArgumentException("A game version is required.", nameof(gameVersion));

@@ -65,6 +65,8 @@ def validate_manifest() -> dict:
 
 def runtime_paths(configuration: str) -> dict[str, Path]:
     directory = ROOT / "src/DarkFogSynthesis/bin" / configuration / "net472"
+    if any(directory.rglob("DarkFogSynthesis.resources.dll")):
+        raise ValueError("Unexpected localization satellite DLL; clean and rebuild the culture-neutral main assembly.")
     result = {name: directory / name for name in OWN_DLLS}
     for name, path in result.items():
         if not path.is_file() or path.is_symlink() or path.stat().st_size < 1024 or path.read_bytes()[:2] != b"MZ":
@@ -72,8 +74,32 @@ def runtime_paths(configuration: str) -> dict[str, Path]:
     return result
 
 
+def validate_resource_audit(paths: dict[str, Path]) -> dict:
+    audit_path = ROOT / "artifacts/resource-audit.json"
+    if not audit_path.is_file() or audit_path.is_symlink():
+        raise ValueError("No compiled-resource audit. Run Build.ps1 successfully before recording or packaging a runtime build.")
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    if audit.get("schemaVersion") != 1 or audit.get("satelliteFree") is not True or audit.get("assemblySha256") != digest(paths["DarkFogSynthesis.dll"]):
+        raise ValueError("Compiled-resource audit is incomplete or does not match the runtime DLL.")
+    expected = []
+    for language in ("en-US", "zh-CN"):
+        source_name = f"Strings.{language}.json"
+        source = ROOT / "src/DarkFogSynthesis/Localization" / source_name
+        expected.append({
+            "name": "DarkFogSynthesis.Localization." + source_name,
+            "sourceName": source_name,
+            "sha256": digest(source),
+            "keyCount": len(json.loads(source.read_text(encoding="utf-8"))),
+        })
+    if audit.get("resources") != expected:
+        raise ValueError("Compiled-resource audit does not match both approved localization sources.")
+    return audit
+
+
 def record_build(configuration: str, reference_mode: str) -> None:
     paths = runtime_paths(configuration)
+    resource_audit = validate_resource_audit(paths)
+    public_api_audit = validate_public_api_audit(paths)
     report = {
         "schemaVersion": 1,
         "runtimeBuildCompleted": True,
@@ -83,7 +109,9 @@ def record_build(configuration: str, reference_mode: str) -> None:
         "configuration": configuration,
         "sourceFingerprint": source_fingerprint(),
         "assemblies": {name: digest(path) for name, path in paths.items()},
-        "notice": "Build.ps1 records this only after pure tests and runtime compilation succeed. Compilation does not establish game compatibility.",
+        "resourceAudit": resource_audit,
+        "publicApiAudit": public_api_audit,
+        "notice": "Build.ps1 records this after pure tests, runtime compilation, compiled-resource validation and public API accessibility audit succeed. These checks do not establish game compatibility.",
     }
     target = ROOT / "artifacts/build-report.json"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -100,6 +128,21 @@ def validate_reference_mode(report: dict, channel: str | None = None) -> str:
     return mode
 
 
+def validate_public_api_audit(paths: dict[str, Path]) -> dict:
+    audit_path = ROOT / "artifacts/public-api-audit.json"
+    if not audit_path.is_file() or audit_path.is_symlink():
+        raise ValueError("No public API accessibility audit. Run Build.ps1 successfully before recording or packaging a runtime build.")
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    if (audit.get("schemaVersion") != 1 or audit.get("status") != "passed"
+            or audit.get("runtimeExecution") != "not_executed"
+            or audit.get("nonpublicAccesses") != 0 or audit.get("unresolvedReferences") != 0
+            or audit.get("assemblySha256") != digest(paths["DarkFogSynthesis.dll"])
+            or not re.fullmatch(r"[0-9a-f]{64}", audit.get("gameReferenceSha256", ""))
+            or any(not isinstance(audit.get(key), int) or audit[key] <= 0 for key in ("directGameMemberSites", "uniqueGameMembers", "gameTypes"))):
+        raise ValueError("Public API accessibility audit is incomplete, failed or does not match the runtime DLL.")
+    return audit
+
+
 def validate_build(configuration: str) -> dict[str, Path]:
     paths = runtime_paths(configuration)
     report_path = ROOT / "artifacts/build-report.json"
@@ -111,6 +154,10 @@ def validate_build(configuration: str) -> dict[str, Path]:
         raise ValueError("Runtime build provenance is stale or incomplete. Rebuild the current inputs.")
     if report.get("assemblies") != {name: digest(path) for name, path in paths.items()}:
         raise ValueError("Runtime DLL hashes do not match the successful build report.")
+    if report.get("resourceAudit") != validate_resource_audit(paths):
+        raise ValueError("Build provenance lacks the matching compiled-resource audit. Rebuild and audit the current inputs.")
+    if report.get("publicApiAudit") != validate_public_api_audit(paths):
+        raise ValueError("Build provenance lacks the matching public API accessibility audit. Rebuild and audit the current inputs.")
     return paths
 
 
@@ -165,6 +212,8 @@ def package(channel: str, configuration: str, acceptance: Path | None, output_di
         reference_mode = validate_reference_mode(json.loads(build_report_path.read_text(encoding="utf-8")), channel)
         files = {name: ROOT / name for name in ("manifest.json", "README.md", "icon.png", "LICENSE")}
         files["BUILD-STATUS.json"] = build_report_path
+        files["RESOURCE-AUDIT.json"] = ROOT / "artifacts/resource-audit.json"
+        files["PUBLIC-API-AUDIT.json"] = ROOT / "artifacts/public-api-audit.json"
         for name, path in dlls.items():
             files[f"BepInEx/plugins/DarkFogSynthesis/{name}"] = path
         for name in ("energy-analysis.png", "information-topology.png"):

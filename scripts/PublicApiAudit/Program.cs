@@ -1,11 +1,18 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Mono.Cecil;
 
 // Metadata inspection only: this tool never loads a game assembly into the CLR or executes game code.
+string? reportPath = null;
+if (args.Length >= 2 && args[^2] == "--json-report")
+{
+    reportPath = args[^1];
+    args = args[..^2];
+}
 if (args.Length < 2)
 {
-    Console.Error.WriteLine("Usage: dotnet run --project scripts/PublicApiAudit -- <plugin.dll> <Assembly-CSharp.dll> [dependency search directories...]");
+    Console.Error.WriteLine("Usage: dotnet run --project scripts/PublicApiAudit -- <plugin.dll> <Assembly-CSharp.dll> [dependency search directories...] [--json-report <path>]");
     return 2;
 }
 
@@ -71,13 +78,35 @@ try
                 catch (Exception error) { unresolved.Add(location + ": " + reference.FullName + ": " + error.Message); }
             }
 
-    Console.WriteLine("Plugin SHA256: " + Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(args[0]))).ToLowerInvariant());
-    Console.WriteLine("Game reference SHA256: " + Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(args[1]))).ToLowerInvariant());
+    string pluginHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(args[0]))).ToLowerInvariant();
+    string gameHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(args[1]))).ToLowerInvariant();
+    Console.WriteLine("Plugin SHA256: " + pluginHash);
+    Console.WriteLine("Game reference SHA256: " + gameHash);
     Console.WriteLine("OriginalAttributes metadata entries: " + originalAttributeCount);
     foreach (var finding in findings) Console.Error.WriteLine("NONPUBLIC " + finding);
     foreach (var error in unresolved) Console.Error.WriteLine("UNRESOLVED " + error);
     Console.WriteLine($"Audited {directSites} direct game member sites, {checkedMembers.Count} unique members, {checkedTypes.Count} game types: {findings.Count} nonpublic accesses, {unresolved.Count} unresolved references.");
     Console.WriteLine("Scope: external public accessibility against the supplied game's original metadata only. This does not establish gameplay compatibility, installed-game equivalence, or validity of reflection/Harmony patch targets.");
+    if (reportPath != null)
+    {
+        string path = Path.GetFullPath(reportPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var report = new
+        {
+            schemaVersion = 1,
+            status = findings.Count == 0 && unresolved.Count == 0 ? "passed" : "failed",
+            assemblySha256 = pluginHash,
+            gameReferenceSha256 = gameHash,
+            originalAttributeCount,
+            directGameMemberSites = directSites,
+            uniqueGameMembers = checkedMembers.Count,
+            gameTypes = checkedTypes.Count,
+            nonpublicAccesses = findings.Count,
+            unresolvedReferences = unresolved.Count,
+            runtimeExecution = "not_executed",
+        };
+        File.WriteAllText(path, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+    }
     return findings.Count == 0 && unresolved.Count == 0 ? 0 : 1;
 
     bool GameScope(TypeReference reference) => reference.GetElementType().Scope?.Name == game.Name.Name;

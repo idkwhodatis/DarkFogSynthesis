@@ -18,6 +18,12 @@ This drained-only path is narrower than frozen P4: generalized cancellation/refu
 
 当前仅准备保守的“已清空设备后生成候选副本”路径：需要明确触发并确认，先备份，另存新文件；设备缓存、手搓队列、活动蓝图或未知引用不安全时停止，不猜测退料。完整 P4 退料和库存守恒尚未验证，不能把候选副本宣称为已证明安全的纯原版存档。
 
+## Read-only buffer diagnostics and known peers
+
+While the current game is paused, **Preview removal blockers** can also show an exact idle-buffer count/proliferation ledger and a whole-batch capacity check on one detached player-package copy. It checks that the actual package is unchanged. This is a diagnostic only: a positive capacity result does not enable automatic refunds or allow occupied machines through cleanup. Active production/research and malformed state are rejected.
+
+Candidate cleanup is blocked whenever MoreMegaStructure is loaded: its StarAssembly may persist these recipe IDs outside native factory/save structures. No peer slots, sidecar files or refunds are changed. Keep the mod and backup until a tested peer-specific removal path exists; simply removing DLLs is not a supported workaround. Other arbitrary combinations are not certified by the absence of this known-peer blocker.
+
 ## Required future supported operation
 
 The frozen plan requires an explicit “Prepare a Vanilla-Compatible Save / 清理本 Mod 数据并另存” maintenance action. It must, in this order:

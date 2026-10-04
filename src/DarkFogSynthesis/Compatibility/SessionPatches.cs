@@ -97,6 +97,7 @@ namespace DarkFogSynthesis.Compatibility
                 GameMain.data.gameDesc == null || sessionPeaceMode.Value != GameMain.data.gameDesc.isPeaceMode)
                 throw new InvalidOperationException("Unsupported or changed session initialization order. The mode policy must be applied before history/queue initialization.");
             SafeRemovalService.OnNewSession(GameMain.data);
+            Plugin.Instance.ValidateLoadedMachines(GameMain.data);
             SaveReconciler.Reconcile(GameMain.data.history);
             GameMain.data.history.VerifyTechQueue();
         }
@@ -106,6 +107,17 @@ namespace DarkFogSynthesis.Compatibility
 
         [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyPostfix, HarmonyPriority(Priority.Last)]
         private static void AfterBegin() => Plugin.Instance.DiagnoseLateConflicts();
+
+        [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyFinalizer]
+        private static Exception? BeginFailed(Exception? __exception)
+        {
+            if (__exception != null)
+            {
+                if (GameMain.data != null && GameMain.isRunning) GameMain.Pause();
+                Plugin.Instance.AbortSession(__exception);
+            }
+            return __exception;
+        }
 
         private static void BeginTransition(GameData data)
         {

@@ -76,9 +76,23 @@ namespace DarkFogSynthesis.Compatibility
         {
             if (GameMain.data == null || GameMain.mainPlayer == null) return "No loaded game to inspect.";
             var scan = Scan(GameMain.data, false);
-            return scan.Blockers.Count == 0
+            string summary = scan.Blockers.Count == 0
                 ? $"Candidate preflight: {scan.Assemblers.Count} assembler/smelter and {scan.Labs.Count} lab references. No active buffers found. Vanilla reload and external blueprint safety are still unverified."
                 : "Cleanup blocked: " + string.Join("; ", scan.Blockers.Take(12));
+            if (!GameMain.isPaused)
+                return summary + " Pause the game to inspect read-only idle-buffer totals and package capacity. Automatic refunds remain disabled. / 暂停后可预览闲置缓存账目与背包容量；自动退料仍未启用。";
+            try
+            {
+                var ledger = NativeBufferRefunds.Plan(GameMain.data);
+                if (ledger.Packets.Count == 0) return summary + " Idle-buffer refund ledger is empty; no item transfer was performed.";
+                var capacity = NativeBufferRefunds.CheckPackageCapacity(GameMain.mainPlayer, ledger);
+                return summary + $" Idle-buffer diagnostic: {capacity.RequestedCount} items, {capacity.RequestedInc} proliferation points; whole-batch package fit: {capacity.Fits}. " +
+                    capacity.Reason + " This diagnostic does not permit cleanup of occupied machines. / 此预览不解除有缓存设备的清理限制。";
+            }
+            catch (Exception error)
+            {
+                return summary + " Refund-capacity diagnostic unavailable: " + error.Message + " No automatic refund was attempted.";
+            }
         }
 
         internal static string PrepareCandidate()
@@ -212,6 +226,10 @@ namespace DarkFogSynthesis.Compatibility
         private static ScanResult Scan(GameData data, bool requireRemoved)
         {
             var result = new ScanResult();
+            // A peer may persist our recipe IDs outside native factories and history. Do not inspect or mutate
+            // its private state, and do not imply that removing either plugin would clean that separate data.
+            foreach (var blocker in PeerPersistenceGuard.FindBlockers(BepInEx.Bootstrap.Chainloader.PluginInfos.Keys))
+                result.Blockers.Add(blocker.Reason);
             if (RemovalSafetyPolicy.HasCustomQueueReferences(data.history.currentTech, data.history.techQueue,
                 data.mainPlayer.mecha.forge.tasks.Select(t => t.recipeId).ToArray()))
                 result.Blockers.Add("Custom or unknown crafting/research queue state must be cleared with native controls before cleanup.");

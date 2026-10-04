@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Logging;
 using DarkFogSynthesis.Core.Definitions;
+using DarkFogSynthesis.Core.Compatibility;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,6 +22,12 @@ namespace DarkFogSynthesis.Compatibility
         private const string ChoiceName = "dark-fog-synthesis-matrix-choice";
         private static readonly ManualLogSource Log = BepInEx.Logging.Logger.CreateLogSource("DarkFogSynthesis.Lab");
         private static readonly Dictionary<UILabWindow, LabChoice> Choices = new Dictionary<UILabWindow, LabChoice>();
+
+        internal static void ValidateSupportedMatrixRegistry()
+        {
+            if (!NativeMatrixContract.IsSupported(LabComponent.matrixIds))
+                throw new InvalidOperationException("The native research-matrix registry was changed. This build supports the six vanilla matrix IDs in their original order; global matrix overhauls need separate compatibility work. / 科研矩阵列表已改变；当前版本只支持原版六色矩阵，未修改其他 Mod 的列表。");
+        }
 
         [HarmonyPostfix, HarmonyPatch(typeof(UILabWindow), "_OnCreate")]
         private static void OnCreate(UILabWindow __instance)
@@ -121,7 +128,7 @@ namespace DarkFogSynthesis.Compatibility
             // A rejected ID collision must not adapt somebody else's recipe with this ID.
             if (Plugin.Instance != null && Plugin.Instance.Ready &&
                 __instance.recipeId == ProtoIds.DarkFogMatrix.Value && __result != 0U)
-                __result = 6U;
+                __result = NativeMatrixContract.IsSupported(LabComponent.matrixIds) ? 6U : 0U;
         }
 
         internal static void Dispose()

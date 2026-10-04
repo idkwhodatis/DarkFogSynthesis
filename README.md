@@ -68,7 +68,7 @@ Peace Mode always adds the four agreed combat prerequisites to the four vanilla 
 
 ## Verification and removal / 验收与卸载
 
-[Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)
+[Existing-mod source comparison](docs/compatibility/mod-source-comparison.md) · [Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)
 
 **Do not assume deleting the DLL is safe.** Active machines, research/crafting queues and blueprints may retain custom IDs. A fully validated “Prepare a Vanilla-Compatible Save” operation is not currently established. Retain or restore the untouched pre-Mod backup for ordinary play; do not overwrite it with experimental saves. 不能将“产物全是原版物品”视为安全卸载证明。
 

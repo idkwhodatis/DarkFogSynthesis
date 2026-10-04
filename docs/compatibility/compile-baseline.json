@@ -58,12 +58,25 @@
   ],
   "verification": {
     "pluginBuild": "passed: zero warnings/errors",
-    "pureTests": {"passed": 50, "assertions": 7115},
-    "packagingGuardTests": {"passed": 12},
+    "pureTests": {
+      "passed": 66,
+      "assertions": 7289
+    },
+    "packagingGuardTests": {
+      "passed": 17
+    },
     "assetsAndLocalization": "passed",
-    "publicApiAccessibility": "metadata-only audit against original visibility; passed",
-    "gameAcceptanceCases": {"total": 35, "executed": 0},
-    "fullP4InventoryRefunds": "not implemented; conservative drained-state candidate only"
+    "publicApiAccessibility": "passed: 791 direct game member sites, 195 unique members, 46 game types; no nonpublic/unresolved",
+    "gameAcceptanceCases": {
+      "total": 35,
+      "executed": 0
+    },
+    "fullP4InventoryRefunds": "not implemented; conservative drained-state candidate only",
+    "resourceAuditSelfTests": {
+      "passed": 15
+    },
+    "compiledLocalizationResources": "passed: exact 30-key English/Chinese JSON in main DLL; no satellites",
+    "frameworkRuntimeAssemblyResolution": "not_executed: verify installed Unity profile including System.Web.Extensions"
   },
   "distribution": "All reference binaries stayed outside the source tree and are excluded from source/runtime packages. No game was launched or saves altered during these checks."
 }

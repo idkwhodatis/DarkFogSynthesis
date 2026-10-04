@@ -17,7 +17,7 @@ No legally installed target game is present in this implementation environment. 
 
 ## Focused P0 evidence still required
 
-- P0-A: exact IDs, semantic fields, resolved caches, recipe grid occupancy, complete hidden-node layout, upstream ingredient/device reachability
+- P0-A: exact IDs, semantic fields, resolved caches, recipe grid occupancy, complete hidden-node layout, upstream ingredient/device reachability; verify actual framework assembly resolution, including System.Web.Extensions, in the installed Unity profile
 - P0-B: three-input smelter and four-input matrix-lab production, automation, storage, upgrades, stacking, mode switches, proliferation and handcrafting; no changes to global ordinary matrix arrays
 - P0-C: four hidden technologies across recipe locked / recipe unlocked / machine output uncollected / acquired / inventory emptied, before and after combat prerequisite; compare original discovery and queue behavior
 - P0-D: minimal registration, research, manufacture, save/reload and direct-removal experiments; expand only with explained integrity results

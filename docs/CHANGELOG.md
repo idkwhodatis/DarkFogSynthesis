@@ -14,3 +14,11 @@
 - Added explicit unverified baseline/layout templates and the complete D01–V01 acceptance matrix
 
 No target-game production, discovery, save migration, cleanup, achievement, Metadata or Milky Way acceptance is claimed. The authoritative implementation plan remains unchanged. Actual build/test evidence is recorded separately; this changelog is not a release acceptance report.
+
+### Existing-mod source review follow-up
+
+- Fixed localized JSON being emitted to unshipped satellites; added explicit main-DLL resource names and mandatory compiled-resource audits
+- Reviewed pinned Genesis, MoreMegaStructure and FractionateEverything sources; preserved license boundaries and documented rejected out-of-scope approaches
+- Added queued/final anchor, item/cache and loaded-machine checks; rejected altered global research-matrix configurations
+- Added a known-peer sidecar cleanup blocker and read-only idle-buffer inventory/capacity diagnostics; general refund execution remains disabled
+- Verification: 66 pure tests (7,289 assertions), 17 package guards, 15 resource-audit self-tests, clean reference build and metadata audits

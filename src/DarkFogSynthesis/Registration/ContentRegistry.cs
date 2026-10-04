@@ -5,6 +5,7 @@ using System.Linq;
 using CommonAPI.Systems;
 using DarkFogSynthesis.Core.Definitions;
 using DarkFogSynthesis.Core.Registration;
+using DarkFogSynthesis.Core.Compatibility;
 using HarmonyLib;
 using UnityEngine;
 using xiaoye97;
@@ -18,6 +19,7 @@ namespace DarkFogSynthesis.Registration
         private readonly Dictionary<int, TechProto> technologies = new Dictionary<int, TechProto>();
         private bool queued;
         internal bool Ready { get; private set; }
+        internal bool OwnsRecipe(int id) => recipes.TryGetValue(id, out var recipe) && ReferenceEquals(LDB.recipes.Select(id), recipe);
 
         internal void Register()
         {
@@ -45,10 +47,11 @@ namespace DarkFogSynthesis.Registration
             }
 
             var layout = TechLayoutResolver.Resolve(Diagnostics.CompatibilityReport.GameVersion);
+            var knownTechAnchors = LDB.techs.dataArray.Concat(pending.OfType<TechProto>()).Where(t => t != null)
+                .Select(t => new KeyValuePair<TechId, TechPosition>(new TechId(t.ID), new TechPosition(t.Position.x, t.Position.y))).ToArray();
             foreach (var node in layout.Candidates)
-                // CommonAPI's main-tree ID contract is <= 2000. Upgrade-page coordinates are a separate canvas.
-                Require(!LDB.techs.dataArray.Any(t => t != null && t.ID <= 2000 && t.Position.x == node.Position.X && t.Position.y == node.Position.Y),
-                    "Candidate technology position is occupied; do not move vanilla nodes. ID " + node.Tech);
+                Require(TechLayoutResolver.FindMainTreeAnchorCollisions(node.Tech, node.Position, knownTechAnchors).Count == 0,
+                    "Candidate technology position is occupied by a current or pending main-page node; do not move vanilla nodes. ID " + node.Tech);
 
             using (ProtoRegistry.StartModLoad(Plugin.Guid))
             {
@@ -153,6 +156,17 @@ namespace DarkFogSynthesis.Registration
                     && recipe.ResultCounts.SequenceEqual(new[] { definition.Output.Count }), "Frozen recipe data changed: " + definition.Id);
                 var owners = LDB.techs.dataArray.Where(t => (t.UnlockRecipes ?? Array.Empty<int>()).Contains(recipe.ID)).Select(t => t.ID).ToArray();
                 Require(owners.SequenceEqual(new[] { definition.UnlockTech.Value }), "Recipe has an unexpected or duplicate unlock owner: " + definition.Id);
+                var owner = LDB.techs.Select(definition.UnlockTech.Value);
+                var expectedUnlocks = owner.UnlockRecipes.Select(id => LDB.recipes.Select(id)).ToArray();
+                Require(owner.unlockRecipeArray != null && owner.unlockRecipeArray.Length == expectedUnlocks.Length &&
+                    owner.unlockRecipeArray.Zip(expectedUnlocks, ReferenceEquals).All(same => same),
+                    "Unlock recipe cache changed after binding: technology " + owner.ID);
+                var output = LDB.items.Select(definition.Output.Item.Value);
+                Require(output.recipes != null && output.recipes.Count(r => ReferenceEquals(r, recipe)) == 1 &&
+                    output.handcrafts != null && output.handcrafts.Count(r => ReferenceEquals(r, recipe)) == 1,
+                    "The output item's recipe/handcraft caches do not contain the registered recipe exactly once: " + definition.Id);
+                ValidateItemFallback(output.maincraft, output.maincraftProductCount, output.ID, "maincraft");
+                ValidateItemFallback(output.handcraft, output.handcraftProductCount, output.ID, "handcraft");
                 Require(LDB.recipes.dataArray.Count(r => r.ID == recipe.ID) == 1, "Duplicate recipe ID: " + recipe.ID);
                 Require(LDB.recipes.dataArray.Count(r => r.GridIndex == recipe.GridIndex) == 1, "Recipe selector collision: " + recipe.GridIndex);
             }
@@ -167,6 +181,10 @@ namespace DarkFogSynthesis.Registration
                     tech.Items.SequenceEqual(definition.ResearchCost.Select(i => i.Item.Value)), "New technology research costs changed.");
                 Require(tech.PreItem.Length == 0 && !tech.IsHiddenTech && tech.AddItems.Length == 0 && tech.UnlockFunctions.Length == 0,
                     "Unexpected new technology effects.");
+                var finalAnchors = LDB.techs.dataArray.Where(t => t != null).Select(t =>
+                    new KeyValuePair<TechId, TechPosition>(new TechId(t.ID), new TechPosition(t.Position.x, t.Position.y)));
+                Require(TechLayoutResolver.FindMainTreeAnchorCollisions(definition.Id, new TechPosition(tech.Position.x, tech.Position.y), finalAnchors).Count == 0,
+                    "A later registration occupied this mod's main-page technology anchor: " + definition.Id + ". Exact-anchor checks do not certify expanded layout bounds.");
             }
         }
 
@@ -178,12 +196,67 @@ namespace DarkFogSynthesis.Registration
             foreach (var definition in FrozenContent.Recipes)
             {
                 Require(cache.TryGetValue(definition.Id.Value, out var data), "Missing native execution cache: " + definition.Id);
-                Require(data!.productive && data.timeSpend == definition.TimeSpendTicks * 10000 && data.extraTimeSpend == definition.TimeSpendTicks * 100000
-                    && data.requires.SequenceEqual(definition.Inputs.Select(i => i.Item.Value)) && data.requireCounts.SequenceEqual(definition.Inputs.Select(i => i.Count))
-                    && data.products.SequenceEqual(new[] { definition.Output.Item.Value }) && data.productCounts.SequenceEqual(new[] { definition.Output.Count }),
+                Require(ExecutionMatches(data, definition),
                     "Native execution cache does not match the frozen recipe: " + definition.Id);
             }
         }
+
+        internal void ValidateSavedRecipeCaches(GameData game)
+        {
+            // A valid global cache does not establish that existing machines refer to matching execute data.
+            // Validate only our recipe IDs; do not globally replace other mods' buffers or execution references.
+            var definitions = FrozenContent.Recipes.ToDictionary(r => r.Id.Value);
+            for (int f = 0; f < game.factoryCount; ++f)
+            {
+                var factory = game.factories[f];
+                if (factory?.factorySystem == null) continue;
+                var system = factory.factorySystem;
+                for (int i = 1; i < system.assemblerCursor; ++i)
+                {
+                    var machine = system.assemblerPool[i];
+                    if (machine.id != i || !definitions.TryGetValue(machine.recipeId, out var definition)) continue;
+                    Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
+                        BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
+                        "Saved assembler cache/buffer shape mismatch for recipe " + definition.Id + " on planet " + factory.planetId);
+                }
+                for (int i = 1; i < system.labCursor; ++i)
+                {
+                    var machine = system.labPool[i];
+                    if (machine.id != i || machine.researchMode || !definitions.TryGetValue(machine.recipeId, out var definition)) continue;
+                    Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
+                        BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
+                        "Saved lab cache/buffer shape mismatch for recipe " + definition.Id + " on planet " + factory.planetId);
+                }
+            }
+        }
+
+        internal void ValidateImportedAssembler(AssemblerComponent machine)
+        {
+            if (machine.id <= 0 || !OwnsRecipe(machine.recipeId)) return;
+            var definition = FrozenContent.Recipes.Single(r => r.Id.Value == machine.recipeId);
+            Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
+                BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
+                "Owned assembler import has incompatible execute data or buffer shape. Load stopped before LDBTool's known buffer sanitizer; no replacement arrays were created.");
+        }
+
+        internal void ValidateImportedLab(LabComponent machine)
+        {
+            if (machine.id <= 0 || machine.researchMode || !OwnsRecipe(machine.recipeId)) return;
+            var definition = FrozenContent.Recipes.Single(r => r.Id.Value == machine.recipeId);
+            Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
+                BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
+                "Owned lab import has incompatible execute data or buffer shape. Load stopped without clearing its buffers.");
+        }
+
+        private static bool ExecutionMatches(RecipeExecuteData? data, RecipeDefinition definition) => data != null && data.productive &&
+            data.timeSpend == definition.TimeSpendTicks * 10000 && data.extraTimeSpend == definition.TimeSpendTicks * 100000 &&
+            data.requires != null && data.requires.SequenceEqual(definition.Inputs.Select(i => i.Item.Value)) &&
+            data.requireCounts != null && data.requireCounts.SequenceEqual(definition.Inputs.Select(i => i.Count)) &&
+            data.products != null && data.products.SequenceEqual(new[] { definition.Output.Item.Value }) &&
+            data.productCounts != null && data.productCounts.SequenceEqual(new[] { definition.Output.Count });
+
+        private static bool BufferShapeMatches(int[]? served, int[]? inc, int[]? produced, RecipeDefinition definition) =>
+            RecipeBufferContract.Matches(definition, served, inc, produced);
 
         private static IEnumerable<int> RequiredVanillaTechs() => FrozenContent.Technologies
             .SelectMany(t => t.ExplicitPrerequisites.Concat(t.ImplicitPrerequisites)).Select(t => t.Value)
@@ -201,6 +274,15 @@ namespace DarkFogSynthesis.Registration
 
         private static ERecipeType RecipeType(ProductionMachine machine) => machine == ProductionMachine.Smelter ? ERecipeType.Smelt
             : machine == ProductionMachine.MatrixLab ? ERecipeType.Research : ERecipeType.Assemble;
+        private static void ValidateItemFallback(RecipeProto? recipe, int cachedCount, int itemId, string cacheName)
+        {
+            Require(recipe != null && ReferenceEquals(LDB.recipes.Select(recipe.ID), recipe),
+                "Missing or stale " + cacheName + " recipe cache for item " + itemId);
+            int result = Array.IndexOf(recipe!.Results, itemId);
+            Require(result >= 0 && result < recipe.ResultCounts.Length && recipe.ResultCounts[result] > 0 && cachedCount == recipe.ResultCounts[result],
+                "Incorrect " + cacheName + " product-count cache for item " + itemId);
+            // This may legitimately be another mod's existing alternate recipe. Never replace it during validation.
+        }
         private static void SetProductive(RecipeProto recipe)
         {
             // The current game's setter is nonpublic; publicized reference assemblies must not hide that boundary.

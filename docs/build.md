@@ -26,7 +26,7 @@ Do not commit `Local.Build.props`, game assemblies, dependency binaries, saves, 
 ./scripts/Package.ps1 -Channel experimental
 ```
 
-`-CoreOnly` runs asset/content checks and the pure-test executable, without claiming runtime compilation. A full build runs the same checks, compiles the plugin against configured local references, then records assembly hashes and a build-input fingerprint in `artifacts/build-report.json`. No install/copy-to-game target runs. A failed build does not produce success provenance.
+`-CoreOnly` runs asset/content checks and the pure-test executable, without claiming runtime compilation. A full build runs the same checks, compiles the plugin against configured local references, runs metadata-only resource and original-API accessibility audits, then records assembly hashes and a build-input fingerprint in `artifacts/build-report.json`. No install/copy-to-game target runs. A failed build does not produce success provenance.
 
 The default `-ReferenceMode installed-local` means references were supplied from the local installation; it still records `installedGameValidated=false` and `runtimeExecution=not_executed`. For an explicitly identified compile-only reference-assembly experiment, pass `-ReferenceMode reference-assembly-smoke`. That classification is preserved in `BUILD-STATUS.json` and the package notice and can produce an experimental package only. Reference-assembly compilation is not an installed-game test and cannot qualify for `release`. Never relabel a reference-assembly compile as a local game build.
 
@@ -57,3 +57,7 @@ The package root requirements and 256 × 256 icon size follow [Thunderstore's pa
 ## 中文摘要
 
 核心与纯测试无需游戏；插件编译必须引用本机合法安装的游戏和依赖。构建不复制游戏 DLL，不安装插件，不改存档。源码包明确标为不可安装。实验安装包要求真实 DLL 和当前构建记录。正式包还要求全部 35 项游戏验收通过、明确批准及可核对证据；当前未执行的报告必定阻止正式包。编译成功不等于兼容性通过。
+
+## Compiled resource gate
+
+`Build.ps1` runs `ResourceAudit --self-test`, then checks the built main DLL against both approved localization JSON files. Culture inference is explicitly disabled; satellite `DarkFogSynthesis.resources.dll` files are rejected. The build resolves reference/output properties through MSBuild SDK 8 and runs PublicApiAudit before provenance. Direct `package.py --record-build` also requires current successful `artifacts/resource-audit.json` and `artifacts/public-api-audit.json`; stale or missing audit hashes are refused. Both reports are included in experimental packages. These checks inspect metadata/resources only and do not launch the game or certify runtime behavior.

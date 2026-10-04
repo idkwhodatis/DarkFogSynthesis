@@ -27,6 +27,10 @@ namespace DarkFogSynthesis.Core.Tests
                 ("T01 candidate ItemPoints encode totals, not rates of 100/300", ResearchEncoding),
                 ("D01 immutable definitions and lists", ImmutableDefinitions),
                 ("D01 industrial routes, handcraft and native proliferation contract", ProductionContract),
+                ("R02 six native research matrices retain their original order", NativeMatrixRegistry),
+                ("R02 altered matrix registry fails without repairing another mod", AlteredMatrixRegistry),
+                ("S06 incompatible import buffer shapes are rejected before repair", ImportedBufferShapes),
+                ("S06 buffer shape checks preserve all original quantities and points", BufferShapeCheckIsPure),
                 ("D01 typed ID equality and invalid arguments", TypedIds),
                 ("D03 all four configuration combinations", TruthTable),
                 ("T03 exact hidden/combat mapping", CombatMapping),
@@ -59,6 +63,11 @@ namespace DarkFogSynthesis.Core.Tests
                 ("C02 all fixed ID collisions fail, no reassignment", CollisionGuard),
                 ("V01 no version currently claims verified layout", CandidateLayoutOnly),
                 ("V01 measured bounds cover expanded states and edge contact", MeasuredLayoutCollisions),
+                ("V01 pending and inserted main-tree anchors both collide", AnchorPendingCollisions),
+                ("V01 main-page boundary is separate from upgrade coordinates", AnchorPageBoundary),
+                ("V01 own anchor ignored and duplicate peers reported once", AnchorOwnAndDuplicateIds),
+                ("V01 anchor checks are exact and do not certify bounds", AnchorExactOnly),
+                ("V01 anchor invalid arguments are rejected", AnchorInvalidArguments),
                 ("C02 checked-in fixed ID manifest matches executable definitions", ProtoManifest),
                 ("V01 both localization resources cover all content keys", LocalizationCoverage),
                 ("U03 preflight allows only empty production state", RemovalEmptyProduction),
@@ -69,6 +78,14 @@ namespace DarkFogSynthesis.Core.Tests
                 ("U03 each custom queued/current ID blocks", RemovalCustomQueues),
                 ("U03 unknown or invalid queue snapshots fail closed", RemovalUnknownQueues),
                 ("U03 preflight predicates do not mutate inputs", RemovalPreflightIsPure),
+                ("U03 required frameworks do not trigger the peer blocker", PeerFrameworksDoNotBlock),
+                ("U03 peer GUID identity uses exact ordinal matching", PeerGuidIdentity),
+                ("U03 known peer blocks without a version exemption", PeerUnknownVersionsBlock),
+                ("U03 peer blocker names the mod and explains uncovered saves", PeerBlockerReason),
+                ("U03 peer inventory and blocker results are immutable", PeerInventoryIsPure),
+                ("U03 invalid peer inventories fail closed", PeerInvalidInventories),
+                ("U03 refund ledger preserves exact idle inventory and rejects uncertain state",
+                    () => RefundLedgerTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("C02 invalid arguments are rejected", InvalidArguments)
             };
             foreach (var test in tests)
@@ -101,6 +118,55 @@ namespace DarkFogSynthesis.Core.Tests
                 Equal(e.Item4, r.Output.Count); Equal(e.Item5, r.TimeSpendTicks); Equal(e.Item6, r.UnlockTech.Value);
                 Sequence(e.Item7, r.Inputs.Select(input => (input.Item.Value, input.Count)));
             }
+        }
+
+        private static void NativeMatrixRegistry()
+        {
+            True(NativeMatrixContract.IsSupported(new[] {6001,6002,6003,6004,6005,6006}));
+            True(!NativeMatrixContract.IsSupported(null));
+            True(!NativeMatrixContract.IsSupported(Array.Empty<int>()));
+            True(!NativeMatrixContract.IsSupported(new[] {6001,6002,6003,6004,6005}));
+        }
+
+        private static void ImportedBufferShapes()
+        {
+            foreach (var recipe in FrozenContent.Recipes)
+            {
+                int n = recipe.Inputs.Count;
+                True(RecipeBufferContract.Matches(recipe,new int[n],new int[n],new int[1]));
+                True(!RecipeBufferContract.Matches(recipe,null,new int[n],new int[1]));
+                True(!RecipeBufferContract.Matches(recipe,new int[n],null,new int[1]));
+                True(!RecipeBufferContract.Matches(recipe,new int[n],new int[n],null));
+                True(!RecipeBufferContract.Matches(recipe,new int[n-1],new int[n],new int[1]));
+                True(!RecipeBufferContract.Matches(recipe,new int[n],new int[n+1],new int[1]));
+                True(!RecipeBufferContract.Matches(recipe,new int[n],new int[n],new int[2]));
+            }
+            Throws<ArgumentNullException>(() => RecipeBufferContract.Matches(null!,null,null,null));
+        }
+
+        private static void BufferShapeCheckIsPure()
+        {
+            var recipe = FrozenContent.Recipes[0];
+            var served = new[] {4,5,6}; var points = new[] {7,8,9}; var produced = new[] {2};
+            True(RecipeBufferContract.Matches(recipe,served,points,produced));
+            Sequence(new[] {4,5,6},served); Sequence(new[] {7,8,9},points); Sequence(new[] {2},produced);
+            True(!RecipeBufferContract.Matches(recipe,served,points,new[] {2,3}));
+            Sequence(new[] {4,5,6},served); Sequence(new[] {7,8,9},points);
+        }
+
+        private static void AlteredMatrixRegistry()
+        {
+            var ids = new[] {6001,6002,6003,6004,6005,6006};
+            var before = ids.ToArray();
+            for (int i = 0; i < ids.Length; ++i)
+            {
+                var changed = ids.ToArray(); changed[i] = 5201;
+                var snapshot = changed.ToArray();
+                True(!NativeMatrixContract.IsSupported(changed)); Sequence(snapshot,changed);
+            }
+            True(!NativeMatrixContract.IsSupported(ids.Reverse().ToArray()));
+            True(!NativeMatrixContract.IsSupported(ids.Concat(new[] {6007}).ToArray()));
+            Sequence(before,ids);
         }
 
         private static void FixedIds()
@@ -540,6 +606,66 @@ namespace DarkFogSynthesis.Core.Tests
             True(!TechLayoutResolver.Resolve("unverified").IsVerified);
         }
 
+        private static void AnchorPendingCollisions()
+        {
+            var position = FrozenContent.Technologies[0].CandidatePosition;
+            var inserted = new[] {new KeyValuePair<TechId,TechPosition>(new TechId(1908),position)};
+            var pending = new[] {new KeyValuePair<TechId,TechPosition>(new TechId(1909),position)};
+            var combined = inserted.Concat(pending).ToArray(); var before = combined.ToArray();
+            var result = TechLayoutResolver.FindMainTreeAnchorCollisions(ProtoIds.EnergyAnalysis,position,combined);
+            Sequence(new[] {1908,1909},result.Select(id => id.Value));
+            Sequence(before,combined); ReadOnly(result);
+            Equal(0,TechLayoutResolver.FindMainTreeAnchorCollisions(ProtoIds.EnergyAnalysis,position,
+                Array.Empty<KeyValuePair<TechId,TechPosition>>()).Count);
+        }
+
+        private static void AnchorPageBoundary()
+        {
+            var position = FrozenContent.Technologies[1].CandidatePosition;
+            var existing = new[]
+            {
+                new KeyValuePair<TechId,TechPosition>(new TechId(3506),position),
+                new KeyValuePair<TechId,TechPosition>(new TechId(2001),position),
+                new KeyValuePair<TechId,TechPosition>(new TechId(2000),position),
+                new KeyValuePair<TechId,TechPosition>(new TechId(1),position)
+            };
+            Sequence(new[] {1,2000},TechLayoutResolver.FindMainTreeAnchorCollisions(ProtoIds.InformationTopology,position,existing)
+                .Select(id => id.Value));
+            Sequence(new[] {1},TechLayoutResolver.FindMainTreeAnchorCollisions(new TechId(2000),position,existing)
+                .Select(id => id.Value));
+        }
+
+        private static void AnchorOwnAndDuplicateIds()
+        {
+            var position = FrozenContent.Technologies[0].CandidatePosition;
+            var own = new KeyValuePair<TechId,TechPosition>(ProtoIds.EnergyAnalysis,position);
+            var peer = new KeyValuePair<TechId,TechPosition>(new TechId(1918),position);
+            Sequence(new[] {1918},TechLayoutResolver.FindMainTreeAnchorCollisions(ProtoIds.EnergyAnalysis,position,
+                new[] {own,peer,peer,own}).Select(id => id.Value));
+            Equal(0,TechLayoutResolver.FindMainTreeAnchorCollisions(ProtoIds.EnergyAnalysis,position,new[] {own,own}).Count);
+        }
+
+        private static void AnchorExactOnly()
+        {
+            var position = FrozenContent.Technologies[0].CandidatePosition;
+            var close = new[]
+            {
+                new KeyValuePair<TechId,TechPosition>(new TechId(1918),new TechPosition(position.X + 0.01f,position.Y)),
+                new KeyValuePair<TechId,TechPosition>(new TechId(1919),new TechPosition(position.X,position.Y + 0.01f))
+            };
+            Equal(0,TechLayoutResolver.FindMainTreeAnchorCollisions(ProtoIds.EnergyAnalysis,position,close).Count);
+            True(!TechLayoutResolver.Resolve("peer-layout-not-measured").IsVerified);
+        }
+
+        private static void AnchorInvalidArguments()
+        {
+            var empty = Array.Empty<KeyValuePair<TechId,TechPosition>>();
+            Throws<ArgumentOutOfRangeException>(() => TechLayoutResolver.FindMainTreeAnchorCollisions(default,default,empty));
+            Throws<ArgumentOutOfRangeException>(() => TechLayoutResolver.FindMainTreeAnchorCollisions(new TechId(2001),default,empty));
+            Throws<ArgumentOutOfRangeException>(() => TechLayoutResolver.FindMainTreeAnchorCollisions(new TechId(3506),default,empty));
+            Throws<ArgumentNullException>(() => TechLayoutResolver.FindMainTreeAnchorCollisions(ProtoIds.EnergyAnalysis,default,null!));
+        }
+
         private static void InvalidArguments()
         {
             Throws<ArgumentNullException>(() => ProgressionPolicy.PlanRestore(null!,OwnedPrerequisiteChanges.Empty));
@@ -702,6 +828,70 @@ namespace DarkFogSynthesis.Core.Tests
             }
             Sequence(before[0],served); Sequence(before[1],inc); Sequence(before[2],produced);
             Sequence(beforeResearch,research); Sequence(beforeCrafting,crafting);
+        }
+
+        private static void PeerFrameworksDoNotBlock()
+        {
+            Equal(0,PeerPersistenceGuard.FindBlockers(Array.Empty<string>()).Count);
+            Equal(0,PeerPersistenceGuard.FindBlockers(new[] {
+                "dsp.common-api.CommonAPI", "me.xiaoye97.plugin.Dyson.LDBTool", "crecheng.DSPModSave",
+                "idkwhodatis.darkfogsynthesis", "unrelated.plugin" }).Count);
+        }
+
+        private static void PeerGuidIdentity()
+        {
+            const string verifiedGuid = "Gnimaerd.DSP.plugin.MoreMegaStructure";
+            Equal(verifiedGuid,PeerPersistenceGuard.MoreMegaStructureGuid);
+            Equal(1,PeerPersistenceGuard.FindBlockers(new[] {verifiedGuid}).Count);
+            foreach (var nearMatch in new[] {verifiedGuid.ToLowerInvariant(),verifiedGuid.ToUpperInvariant(),
+                " " + verifiedGuid,verifiedGuid + " ",verifiedGuid + ".extra","MoreMegaStructure"})
+                Equal(0,PeerPersistenceGuard.FindBlockers(new[] {nearMatch}).Count);
+        }
+
+        private static void PeerUnknownVersionsBlock()
+        {
+            // Runtime supplies only registry keys. No absent, unparsable or future version can bypass the guard.
+            foreach (string? version in new string?[] {null,"","unknown","1.9.3","99.0.0"})
+            {
+                var loadedPlugins = new Dictionary<string,string?> { [PeerPersistenceGuard.MoreMegaStructureGuid] = version };
+                Equal(1,PeerPersistenceGuard.FindBlockers(loadedPlugins.Keys).Count);
+                Equal(version,loadedPlugins[PeerPersistenceGuard.MoreMegaStructureGuid]);
+            }
+        }
+
+        private static void PeerBlockerReason()
+        {
+            var blocker = PeerPersistenceGuard.FindBlockers(new[] {PeerPersistenceGuard.MoreMegaStructureGuid}).Single();
+            Equal(PeerPersistenceGuard.MoreMegaStructureGuid,blocker.PluginGuid);
+            Equal("MoreMegaStructure",blocker.DisplayName);
+            True(blocker.Reason.Contains(blocker.DisplayName,StringComparison.Ordinal));
+            True(blocker.Reason.Contains("separate mod-save",StringComparison.Ordinal));
+            True(blocker.Reason.Contains("recipe IDs",StringComparison.Ordinal));
+            True(blocker.Reason.Contains("blocked",StringComparison.Ordinal));
+            True(blocker.Reason.Contains("Keep DarkFogSynthesis installed",StringComparison.Ordinal));
+            True(blocker.Reason.Contains("独立 Mod 存档",StringComparison.Ordinal));
+            True(blocker.Reason.Contains("已阻止",StringComparison.Ordinal));
+        }
+
+        private static void PeerInventoryIsPure()
+        {
+            var plugins = new List<string> {PeerPersistenceGuard.MoreMegaStructureGuid,"unrelated.plugin",PeerPersistenceGuard.MoreMegaStructureGuid};
+            var before = plugins.ToArray();
+            var result = PeerPersistenceGuard.FindBlockers(plugins);
+            Equal(1,result.Count); Sequence(before,plugins); ReadOnly(result);
+            True(typeof(PeerPersistenceBlocker).GetProperties().All(property => property.SetMethod == null));
+            plugins.Clear(); Equal(1,result.Count);
+            Equal(0,PeerPersistenceGuard.FindBlockers(plugins).Count);
+            ReadOnly(PeerPersistenceGuard.FindBlockers(plugins));
+        }
+
+        private static void PeerInvalidInventories()
+        {
+            Throws<ArgumentNullException>(() => PeerPersistenceGuard.FindBlockers(null!));
+            foreach (string? invalid in new string?[] {null,""," "})
+                Throws<ArgumentException>(() => PeerPersistenceGuard.FindBlockers(new[] {invalid!}));
+            // Do not stop scanning after a match and silently accept malformed remaining inventory entries.
+            Throws<ArgumentException>(() => PeerPersistenceGuard.FindBlockers(new[] {PeerPersistenceGuard.MoreMegaStructureGuid,null!}));
         }
 
         private static Dictionary<TechId,IReadOnlyList<TechId>> Baseline()

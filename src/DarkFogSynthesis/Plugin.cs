@@ -79,6 +79,7 @@ namespace DarkFogSynthesis
             if (!registry.Ready || fatal != null) throw new InvalidOperationException("DarkFogSynthesis cannot safely enter this save: " + (fatal ?? "prototype initialization did not finish"));
             registry.Validate();
             registry.ValidateExecutionCache();
+            NativeRecipeCompatibility.ValidateSupportedMatrixRegistry();
         }
 
         internal void ApplyMode(bool peace)
@@ -87,6 +88,10 @@ namespace DarkFogSynthesis
             Progression.Apply(peace, nonPeaceAtStartup);
             cleanupCandidate = false;
         }
+
+        internal void ValidateLoadedMachines(GameData data) => registry.ValidateSavedRecipeCaches(data);
+        internal void ValidateImportedAssembler(AssemblerComponent machine) => registry.ValidateImportedAssembler(machine);
+        internal void ValidateImportedLab(LabComponent machine) => registry.ValidateImportedLab(machine);
 
         internal void AbortSession(Exception error)
         {
@@ -97,6 +102,7 @@ namespace DarkFogSynthesis
 
         internal void DiagnoseLateConflicts()
         {
+            NativeRecipeCompatibility.ValidateSupportedMatrixRegistry();
             var required = FrozenContent.Technologies.SelectMany(t => t.ExplicitPrerequisites.Concat(t.ImplicitPrerequisites));
             if (GameMain.data != null && ProgressionPolicy.ShouldApply(GameMain.data.gameDesc.isPeaceMode, nonPeaceAtStartup))
                 required = required.Concat(FrozenContent.CombatPrerequisites.Select(e => e.RequiredCombatTech));

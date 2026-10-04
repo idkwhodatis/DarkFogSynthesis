@@ -22,7 +22,8 @@
     <Reference Include="LDBTool" HintPath="$(LdbToolDir)/LDBTool.dll" Private="false" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Localization/*.json" />
+    <!-- These are raw bilingual dictionaries read from this assembly, not .NET satellite resources. -->
+    <EmbeddedResource Include="Localization/*.json" WithCulture="false" LogicalName="DarkFogSynthesis.Localization.%(Filename)%(Extension)" />
     <None Include="../../assets/generated/*.png" Link="assets/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="RequireLocalReferences" BeforeTargets="ResolveAssemblyReferences">
