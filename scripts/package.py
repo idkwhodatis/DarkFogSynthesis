@@ -18,7 +18,7 @@ import zipfile
 ROOT = Path(__file__).absolute().parents[1]
 OWN_DLLS = ("DarkFogSynthesis.dll", "DarkFogSynthesis.Core.dll")
 CHECK_IDS = tuple(f"{prefix}{n:02}" for prefix, count in (("D", 4), ("R", 6), ("T", 6), ("S", 7), ("U", 5), ("I", 3), ("C", 3), ("V", 1)) for n in range(1, count + 1))
-TOP_FILES = ("README.md", "LICENSE", "manifest.json", "icon.png", "Directory.Build.props", "Directory.Build.targets", "Local.Build.props.example", "global.json", ".gitignore", "DarkFogSynthesis_Implementation_Plan_ZH.md")
+TOP_FILES = (".gitattributes", "README.md", "LICENSE", "manifest.json", "icon.png", "Directory.Build.props", "Directory.Build.targets", "Local.Build.props.example", "global.json", ".gitignore", "DarkFogSynthesis_Implementation_Plan_ZH.md")
 SOURCE_ROOTS = ("src", "tests", "scripts", "docs", "assets", ".github")
 # Logical project paths form part of the tested candidate, including metadata
 # used outside the compiled DLLs. The generated package icon is bound by the
@@ -179,54 +179,142 @@ def validate_resource_audit(paths: dict[str, Path]) -> dict:
     return audit
 
 
-def compiler_provenance(configuration: str, reference_mode: str, paths: dict[str, Path]) -> dict:
-    """Read build-time captures; verify every captured compiler input still exists unchanged.
+# Keep this scope in sync with Directory.Build.targets. It deliberately includes
+# every production-tree file, not just the source ZIP's extension allowlist.
+# Build imports anywhere in the repository are observed too, so newly matching
+# wildcard .props/.targets imports cannot be attached to previously built DLLs.
+INVENTORY_ROOT_FILES = {"global.json", "manifest.json", "icon.png", ".editorconfig", "Directory.Build.rsp", "MSBuild.rsp"}
+INVENTORY_EXCLUDED_DIRS = {"bin", "obj", "__pycache__", ".git", "artifacts"}
+
+
+def production_inventory(snapshot: dict[str, bytes] | None = None) -> dict[str, str]:
+    """Freeze full production membership and hashes, reusing frozen package bytes.
+
+    Local.Build.props remains private: only the aggregate inventory digest is
+    published. Documentation, evidence and test-only edits remain independent.
+    """
+    project_path(ROOT, file=False)
+    snapshot = {} if snapshot is None else snapshot
+    inventory = {}
+    for current, folders, names in os.walk(ROOT, followlinks=False):
+        kept = []
+        for name in folders:
+            parts = (Path(current) / name).relative_to(ROOT).parts
+            production_tree = parts[0] == "src" or parts[:2] in (("assets", "source"), ("assets", "generated"))
+            # SDK default globs exclude direct project bin/obj, not arbitrary
+            # nested directories named obj or __pycache__. Observe those too.
+            project_output = len(parts) == 3 and parts[0] == "src" and parts[2] in {"bin", "obj"}
+            if not project_output and (production_tree or name not in INVENTORY_EXCLUDED_DIRS):
+                kept.append(name)
+        folders[:] = kept
+        for name in folders:
+            project_path(Path(current) / name, file=False)
+        for name in names:
+            path = Path(current) / name
+            relative = path.relative_to(ROOT).as_posix()
+            if (relative.startswith(("src/", "assets/source/", "assets/generated/"))
+                    or relative in INVENTORY_ROOT_FILES or path.suffix.lower() in {".props", ".targets"}):
+                path = project_path(path)
+                content = snapshot[relative] if relative in snapshot else path.read_bytes()
+                inventory[relative] = hashlib.sha256(content).hexdigest()
+    return dict(sorted(inventory.items()))
+
+
+def inventory_fingerprint(inventory: dict[str, str]) -> str:
+    return hashlib.sha256("".join(f"{name}\0{value}\n" for name, value in sorted(inventory.items())).encode("utf-8")).hexdigest()
+
+
+def validate_compiler_capture(project: str, framework: str, configuration: str, reference_mode: str,
+                              output_path: Path, inventory: dict[str, str]) -> tuple[dict, dict]:
+    """Validate one real compiler capture against a frozen complete inventory.
+
+    This helper also permits the genuine Core-only regression to exercise the
+    production validator without game references or DLL-shaped substitutes.
+    """
+    sidecar = project_path(ROOT / "src" / project / "bin" / configuration / framework / f"{project}.build-inputs.txt")
+    fields, resolved, inputs, outputs, captured_inventory = {}, {}, {}, [], {}
+    production_inputs, generated_inputs = set(), set()
+    sidecar_bytes = sidecar.read_bytes()
+    for line in sidecar_bytes.decode("utf-8-sig").splitlines():
+        parts = line.split("|")
+        kind = parts[0]
+        if kind in {"reference", "input", "compile", "resource", "generated", "output", "inventory"}:
+            if len(parts) != (4 if kind == "reference" else 3):
+                raise ValueError("Malformed compiler input capture; rebuild using ordinary unambiguous file paths.")
+            captured_path, expected = Path(parts[1]), parts[-1].lower()
+            if not captured_path.is_absolute() or not re.fullmatch(r"[0-9a-f]{64}", expected):
+                raise ValueError("Compiler input capture has no absolute path or valid checksum.")
+            reject_symlink_components(captured_path)
+            if kind == "inventory":
+                relative = project_path(captured_path).relative_to(ROOT.resolve()).as_posix()
+                if relative in captured_inventory:
+                    raise ValueError("Duplicate production inventory entry in compiler capture.")
+                captured_inventory[relative] = expected
+                continue
+            if not captured_path.is_file() or digest(captured_path) != expected:
+                raise ValueError(f"Missing or changed compiled {kind}: {captured_path.name}. Rebuild and repeat acceptance.")
+            if kind == "reference":
+                identity = parts[2]
+                if not re.fullmatch(r"[^,]+, Version=\d+\.\d+\.\d+\.\d+, Culture=[^,]+, PublicKeyToken=[^,]+", identity) or identity in resolved:
+                    raise ValueError("Missing or duplicate resolved assembly identity in compiler capture.")
+                resolved[identity] = expected
+            elif kind == "output":
+                project_path(captured_path)
+                outputs.append(expected)
+            else:
+                inputs[str(captured_path.resolve())] = expected
+                if kind in {"compile", "resource"}:
+                    production_inputs.add(project_path(captured_path))
+                elif kind == "generated":
+                    generated = project_path(captured_path)
+                    # Only the SDK's two standard generated assembly attribute
+                    # files are exempt from production-tree membership. Linked
+                    # or wildcard sources elsewhere must be moved into src.
+                    intermediate = ROOT.resolve() / "src" / project / "obj"
+                    if (not generated.is_relative_to(intermediate)
+                            or generated.name not in {project + ".AssemblyInfo.cs", ".NETFramework,Version=v4.7.2.AssemblyAttributes.cs", ".NETStandard,Version=v2.0.AssemblyAttributes.cs"}):
+                        raise ValueError("Unsupported generated compiler input outside the standard project intermediates.")
+                    generated_inputs.add(generated)
+        else:
+            if len(parts) != 2 or kind in fields or not parts[1]:
+                raise ValueError("Incomplete or duplicate compiler build capture fields.")
+            fields[kind] = parts[1]
+    if (set(fields) != {"schema", "invocation", "project", "configuration", "referenceMode", "targetFramework", "sdk", "msbuild", "completed"}
+            or fields.get("schema") != "2" or fields.get("project") != project
+            or fields.get("configuration") != configuration or fields.get("referenceMode") != reference_mode
+            or fields.get("targetFramework") != framework
+            or not re.fullmatch(r"[0-9a-f-]{36}", fields.get("invocation", ""))
+            or fields.get("completed") != fields.get("invocation") or not resolved or not inputs or not production_inputs
+            or outputs != [digest(project_path(output_path))]):
+        raise ValueError("Incomplete, stale or mismatched compiler build capture. Rebuild the candidate (capture schema 2 is required).")
+    if not captured_inventory or captured_inventory != inventory:
+        raise ValueError("Production source inventory differs from compilation; additions, deletions, renames or changed inputs require a rebuild.")
+    for path in production_inputs - generated_inputs:
+        relative = path.relative_to(ROOT.resolve()).as_posix()
+        if relative not in inventory or not relative.startswith(("src/", "assets/source/", "assets/generated/")):
+            raise ValueError("Compiler source/resource outside the observed production inventory is unsupported; move it into src and rebuild.")
+        if inputs[str(path)] != inventory[relative]:
+            raise ValueError("Compiler source/resource differs from the frozen production inventory; rebuild the candidate.")
+    return dict(sorted(resolved.items())), {
+        "invocationId": fields["invocation"], "targetFramework": framework,
+        "sdkVersion": fields["sdk"], "msbuildVersion": fields["msbuild"],
+        "captureSha256": hashlib.sha256(sidecar_bytes).hexdigest(),
+        "sourceInventorySha256": inventory_fingerprint(captured_inventory),
+    }
+
+
+def compiler_provenance(configuration: str, reference_mode: str, paths: dict[str, Path],
+                        inventory: dict[str, str] | None = None) -> dict:
+    """Bind both projects to the same frozen inventory and exact compiler inputs.
 
     Paths only occur in ignored local sidecars. Published provenance uses actual
     metadata identities and hashes, never paths guessed from dependency names.
     """
+    inventory = production_inventory() if inventory is None else inventory
     references, captures = {}, {}
     for project, framework in (("DarkFogSynthesis", "net472"), ("DarkFogSynthesis.Core", "netstandard2.0")):
-        sidecar = project_path(ROOT / "src" / project / "bin" / configuration / framework / f"{project}.build-inputs.txt")
-        fields, resolved, inputs, outputs = {}, {}, {}, []
-        for line in sidecar.read_text(encoding="utf-8-sig").splitlines():
-            parts = line.split("|")
-            kind = parts[0]
-            if kind in {"reference", "input", "output"}:
-                if len(parts) != (4 if kind == "reference" else 3):
-                    raise ValueError("Malformed compiler input capture; rebuild using ordinary unambiguous file paths.")
-                captured_path, expected = Path(parts[1]), parts[-1].lower()
-                if not captured_path.is_absolute() or not re.fullmatch(r"[0-9a-f]{64}", expected):
-                    raise ValueError("Compiler input capture has no absolute path or valid checksum.")
-                reject_symlink_components(captured_path)
-                if not captured_path.is_file() or digest(captured_path) != expected:
-                    raise ValueError(f"Missing or changed compiled {kind}: {captured_path.name}. Rebuild and repeat acceptance.")
-                if kind == "reference":
-                    identity = parts[2]
-                    if not re.fullmatch(r"[^,]+, Version=\d+\.\d+\.\d+\.\d+, Culture=[^,]+, PublicKeyToken=[^,]+", identity) or identity in resolved:
-                        raise ValueError("Missing or duplicate resolved assembly identity in compiler capture.")
-                    resolved[identity] = expected
-                elif kind == "input":
-                    inputs[str(captured_path)] = expected
-                else:
-                    project_path(captured_path)
-                    outputs.append(expected)
-            else:
-                if len(parts) != 2 or kind in fields or not parts[1]:
-                    raise ValueError("Incomplete or duplicate compiler build capture fields.")
-                fields[kind] = parts[1]
-        if (set(fields) != {"schema", "invocation", "project", "configuration", "referenceMode", "targetFramework", "sdk", "msbuild", "completed"}
-                or fields.get("schema") != "1" or fields.get("project") != project
-                or fields.get("configuration") != configuration or fields.get("referenceMode") != reference_mode
-                or fields.get("targetFramework") != framework
-                or not re.fullmatch(r"[0-9a-f-]{36}", fields.get("invocation", ""))
-                or fields.get("completed") != fields.get("invocation") or not resolved or not inputs
-                or outputs != [digest(paths[project + ".dll"])]):
-            raise ValueError("Incomplete, stale or mismatched compiler build capture. Rebuild the candidate.")
-        references[project] = dict(sorted(resolved.items()))
-        captures[project] = {"invocationId": fields["invocation"], "targetFramework": framework,
-                             "sdkVersion": fields["sdk"], "msbuildVersion": fields["msbuild"],
-                             "captureSha256": digest(sidecar)}
+        references[project], captures[project] = validate_compiler_capture(
+            project, framework, configuration, reference_mode, paths[project + ".dll"], inventory)
     required = {"Assembly-CSharp", "BepInEx", "0Harmony", "CommonAPI", "LDBTool", "System.Web.Extensions",
                 "UnityEngine", "UnityEngine.CoreModule"}
     if not required.issubset({identity.split(",", 1)[0] for identity in references["DarkFogSynthesis"]}):
@@ -269,7 +357,7 @@ def record_build(configuration: str, reference_mode: str) -> None:
         "sourceFingerprint": source_fingerprint_from_bytes(snapshot),
         "distributionFiles": distribution_hashes(snapshot),
         "assemblies": {name: digest(path) for name, path in paths.items()},
-        **compiler_provenance(configuration, reference_mode, paths),
+        **compiler_provenance(configuration, reference_mode, paths, production_inventory(snapshot)),
         "resourceAudit": resource_audit,
         "publicApiAudit": public_api_audit,
         "notice": "Build.ps1 records this after pure tests, runtime compilation, compiled-resource validation and public API accessibility audit succeed. These checks do not establish game compatibility.",
@@ -324,7 +412,7 @@ def validate_build(configuration: str, *, with_report: bool = False):
         raise ValueError("Distribution assets or manifest do not match the tested candidate. Rebuild and repeat acceptance.")
     if report.get("assemblies") != {name: digest(path) for name, path in paths.items()}:
         raise ValueError("Runtime DLL hashes do not match the successful build report.")
-    provenance = compiler_provenance(configuration, report["referenceMode"], paths)
+    provenance = compiler_provenance(configuration, report["referenceMode"], paths, production_inventory(snapshot))
     if any(report.get(key) != value for key, value in provenance.items()) or report.get("buildIdentity") != build_identity(report):
         raise ValueError("Build identity or resolved compiler references are stale or incomplete. Rebuild the candidate.")
     if report.get("resourceAudit") != validate_resource_audit(paths):
@@ -449,7 +537,9 @@ def package(channel: str, configuration: str, acceptance: Path | None, output_di
     # so neither the manifest nor runtime PNGs can change between check and use.
     snapshot = {name: project_path(path).read_bytes() for name, path in sources.items()}
     if candidate and (candidate["sourceFingerprint"] != source_fingerprint_from_bytes(snapshot)
-                      or candidate["distributionFiles"] != distribution_hashes(snapshot)):
+                      or candidate["distributionFiles"] != distribution_hashes(snapshot)
+                      or any(capture["sourceInventorySha256"] != inventory_fingerprint(production_inventory(snapshot))
+                             for capture in candidate["compilerInputs"].values())):
         raise ValueError("Candidate sources, distribution assets or manifest changed while packaging; rebuild and repeat acceptance.")
     manifest = validate_manifest(snapshot["manifest.json"])
     validate_asset_snapshot(snapshot)

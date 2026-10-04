@@ -34,6 +34,15 @@ The default `-ReferenceMode installed-local` means references were supplied from
 
 The separate real-Harmony regression command is `dotnet run --project tests/DarkFogSynthesis.Harmony.Tests -c Release`. It requires the exact .NET 6.0.36 runtime (SDK 6.0.428 supplies it) alongside the existing .NET 8 SDK. CI runs it explicitly; `Build.ps1` does not install or silently launch that legacy test host. Run it before the final runtime build/provenance capture because its Core project reference is another build invocation. See [the hook-order evidence and host limitations](compatibility/session-completion-evidence-review.md). No game binaries or disk-save fixture are involved.
 
+Two additional portable tooling regressions run explicitly in CI:
+
+```sh
+python scripts/test-checkout-assets.py
+python scripts/test-build-capture.py
+```
+
+The first requires Git and Pillow and tests isolated fresh `core.autocrlf=false/input/true` checkouts, including rejection of a real SVG edit. `.gitattributes` keeps the manifest-hashed SVGs LF and is preserved in source ZIPs; it does not modify user Git settings. The second builds the actual Core project in a temporary copy, using the .NET 8 SDK and ordinary NuGet restore, then checks source additions, failed compilation and successful recovery through the production capture validator. Neither changes the caller's build outputs or needs a game installation. CI exercises both on Linux and Windows. See the [build-input review](compatibility/build-input-review.md).
+
 On platforms without PowerShell, the content/test commands in the README and `python scripts/package.py` are usable directly. The packaging engine is Python standard library; texture validation additionally uses Pillow. `scripts/generate-assets.py` uses installed Inkscape only when regeneration is requested, and records its version. No font or extracted game resource is required.
 
 ## Package channels and safeguards
@@ -63,6 +72,12 @@ The complete ZIP is written and verified in a private staging directory inside t
 `Directory.Build.targets` captures `ReferencePathWithRefAssemblies`, the resolved item list actually passed to the C# compiler, immediately before `CoreCompile` for both production projects. It uses MSBuild's metadata-only `GetAssemblyIdentity` and SHA-256 `GetFileHash` tasks; it does not infer assembly identities from filenames or configured search directories. This covers the game, Unity, BepInEx/Harmony, CommonAPI/LDBTool and framework references, including `System.Web.Extensions`, as well as Core's own compiler references. Source/resource/build-input hashes are captured too. Completion appends the emitted assembly's hash only after a successful `Build` target. A unique invocation ID distinguishes rebuilds even when output bytes are identical.
 
 Ignored `bin/.../*.build-inputs.txt` sidecars retain the actual local paths for revalidation. Do not publish them: they can contain private installation paths. Build/package validation re-hashes the captured files and rejects absent, altered, incomplete or mismatched captures. The public `BUILD-STATUS.json` contains metadata identities and hashes without local paths; its `buildIdentity` is a SHA-256 digest over all binding fields. The API audit's game hash must equal the actual compiler-resolved game reference, not merely any supplied game DLL.
+
+Local capture schema 2 also freezes production **membership**, not just the hashes of previously known paths. It includes every file extension under `src`, `assets/source` and `assets/generated`, repository-local `.props`/`.targets` imports, and selected root build/distribution inputs, including the private `Local.Build.props` when present. Only direct `src/<project>/bin` and `obj` outputs are excluded from production trees; nested directories with those names may contain default-included compiler inputs and remain observed. The separate repository-import scan skips tool/test output, VCS and cache directories. The same inventory must remain unchanged at successful build completion and match both projects when recording or packaging; its aggregate digest is included in public `compilerInputs` without private paths. A newly added default-included `.cs` file, resource or import cannot qualify old DLLs by rerunning `--record-build`. Refusal leaves the prior report intact. Old schema-1 captures require a genuine rebuild.
+
+Membership is also frozen during project evaluation and compared at compiler entry, catching files that appear after the SDK evaluated its default source globs. Every provenance-generating build deliberately executes `CoreCompile`, using an invocation-unique missing `CustomAdditionalCompileOutputs` item from the SDK's supported incremental-input/output contract. It does not certify an incrementally skipped old DLL when source timestamps were preserved. `SkipCompilerExecution` and design-time captures are refused. This trades incremental compilation speed for a truthful capture; no missing-output marker is created or bundled.
+
+Explicit compiler sources/resources must be inside the observed production roots. The SDK's two standard generated assembly-attribute files in the project's `obj` directory are separately identified and hash-checked. Arbitrary linked sources outside those roots and unsupported generated-source layouts fail closed rather than claiming their changing membership was observed. Current project defaults are supported; a custom layout needs a separately reviewed inventory policy. Ordinary documentation and acceptance-evidence edits do not require recompilation.
 
 Schema 3 adds the required `distributionFiles` object to both `BUILD-STATUS.json` and `testedBuild`. It maps these exact project-relative paths to SHA-256 hashes:
 

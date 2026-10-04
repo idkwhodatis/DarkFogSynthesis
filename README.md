@@ -30,6 +30,9 @@ Prerequisites: .NET 8 SDK, Python 3.9+ with Pillow, and PowerShell 7 for the `.p
 python scripts/generate-assets.py --check
 python scripts/validate-content.py
 dotnet run --project tests/DarkFogSynthesis.Core.Tests -c Release
+# Additional isolated build-tooling regressions (Git needed for checkout test)
+python scripts/test-checkout-assets.py
+python scripts/test-build-capture.py
 ```
 
 The separate real-Harmony lifecycle harness requires the isolated .NET **6.0.36** runtime (included in SDK **6.0.428**) in addition to the pinned .NET 8 build SDK:
@@ -81,6 +84,8 @@ Peace Mode always adds the four agreed combat prerequisites to the four vanilla 
 ## Verification and removal / 验收与卸载
 
 [Existing-mod source comparison](docs/compatibility/mod-source-comparison.md) · [Review regressions](docs/compatibility/review-regressions.md) · [Startup/progression/package follow-up](docs/compatibility/startup-progress-packaging-review.md) · [Session completion and evidence review](docs/compatibility/session-completion-evidence-review.md) · [Bounded performance review](docs/compatibility/performance-review.md) · [Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)
+
+[Checkout and compiler-inventory review](docs/compatibility/build-input-review.md): SVG bytes remain stable under Git newline conversion, and newly added production files require recompilation before an old DLL can be recorded or packaged against their source inventory.
 
 **Do not assume deleting the DLL is safe.** Active machines, research/crafting queues and blueprints may retain custom IDs. A fully validated “Prepare a Vanilla-Compatible Save” operation is not currently established. Retain or restore the untouched pre-Mod backup for ordinary play; do not overwrite it with experimental saves. 不能将“产物全是原版物品”视为安全卸载证明。
 

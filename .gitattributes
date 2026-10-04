@@ -1,0 +1,2 @@
+# The asset manifest hashes raw SVG bytes; keep checkouts identical everywhere.
+/assets/source/*.svg text eol=lf

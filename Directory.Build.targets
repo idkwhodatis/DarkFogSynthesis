@@ -1,12 +1,31 @@
 <Project>
-  <!-- Capture the actual compiler inputs, not guessed HintPath locations. These
-       local sidecars are not distributed: public reports contain identities and
-       hashes without private installation paths. GetAssemblyIdentity reads
-       metadata only; it never executes a game or dependency assembly. -->
+  <!-- Capture actual compiler inputs and complete production-tree membership.
+       These local sidecars are not distributed: public reports contain hashes
+       and metadata identities without private installation paths. All tasks are
+       supplied by MSBuild; no game/dependency assembly is executed. -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'DarkFogSynthesis' Or '$(MSBuildProjectName)' == 'DarkFogSynthesis.Core'">
     <DarkFogCaptureBuild>true</DarkFogCaptureBuild>
     <DarkFogReferenceMode Condition="'$(DarkFogReferenceMode)' == ''">installed-local</DarkFogReferenceMode>
+    <!-- Keep inventory membership in sync with package.py production_inventory.
+         Unlike source packaging, these globs include every file extension. -->
+    <_DarkFogInventoryIncludes>$(MSBuildThisFileDirectory)src/**/*;$(MSBuildThisFileDirectory)assets/source/**/*;$(MSBuildThisFileDirectory)assets/generated/**/*</_DarkFogInventoryIncludes>
+    <_DarkFogInventoryExcludes>$(MSBuildThisFileDirectory)src/*/bin/**;$(MSBuildThisFileDirectory)src/*/obj/**</_DarkFogInventoryExcludes>
+    <_DarkFogImportIncludes>$(MSBuildThisFileDirectory)**/*.props;$(MSBuildThisFileDirectory)**/*.targets</_DarkFogImportIncludes>
+    <_DarkFogImportExcludes>$(MSBuildThisFileDirectory)**/bin/**;$(MSBuildThisFileDirectory)**/obj/**;$(MSBuildThisFileDirectory)**/__pycache__/**;$(MSBuildThisFileDirectory)**/.git/**;$(MSBuildThisFileDirectory)**/artifacts/**</_DarkFogImportExcludes>
   </PropertyGroup>
+  <!-- Default Compile/resource globs are evaluated before target execution.
+       A new file appearing only at compiler entry must not be certified as if
+       it had belonged to those earlier evaluated items. -->
+  <ItemGroup Condition="'$(DarkFogCaptureBuild)' == 'true'">
+    <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)global.json" Condition="Exists('$(MSBuildThisFileDirectory)global.json')" />
+    <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)manifest.json" Condition="Exists('$(MSBuildThisFileDirectory)manifest.json')" />
+    <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)icon.png" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
+    <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory).editorconfig" Condition="Exists('$(MSBuildThisFileDirectory).editorconfig')" />
+    <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)Directory.Build.rsp" Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.rsp')" />
+    <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)MSBuild.rsp" Condition="Exists('$(MSBuildThisFileDirectory)MSBuild.rsp')" />
+    <_DarkFogEvaluatedInventory Include="$(_DarkFogInventoryIncludes);@(_DarkFogEvaluatedInventoryRoots)" Exclude="$(_DarkFogInventoryExcludes)" />
+    <_DarkFogEvaluatedInventory Include="$(_DarkFogImportIncludes)" Exclude="$(_DarkFogImportExcludes)" />
+  </ItemGroup>
   <Target Name="CaptureDarkFogCompilerInputs" BeforeTargets="CoreCompile" DependsOnTargets="FindReferenceAssembliesForReferences" Condition="'$(DarkFogCaptureBuild)' == 'true'">
     <PropertyGroup>
       <_DarkFogInvocation>$([System.Guid]::NewGuid().ToString('D'))</_DarkFogInvocation>
@@ -14,8 +33,15 @@
     </PropertyGroup>
     <MakeDir Directories="$(TargetDir)" />
     <!-- Invalidate old success before any capture operation can fail. -->
-    <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="schema|1;invocation|$(_DarkFogInvocation);project|$(MSBuildProjectName);configuration|$(Configuration);referenceMode|$(DarkFogReferenceMode);targetFramework|$(TargetFramework);sdk|$(NETCoreSdkVersion);msbuild|$(MSBuildVersion)" Overwrite="true" Encoding="UTF-8" />
-    <!-- This is the exact item list passed to Csc, including any reference-assembly substitution. -->
+    <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="schema|2;invocation|$(_DarkFogInvocation);project|$(MSBuildProjectName);configuration|$(Configuration);referenceMode|$(DarkFogReferenceMode);targetFramework|$(TargetFramework);sdk|$(NETCoreSdkVersion);msbuild|$(MSBuildVersion)" Overwrite="true" Encoding="UTF-8" />
+    <Error Condition="'$(SkipCompilerExecution)' == 'true' Or '$(DesignTimeBuild)' == 'true'" Text="A compiler provenance capture requires actual compilation, not SkipCompilerExecution or a design-time build." />
+    <ItemGroup>
+      <!-- A capture is a new compiler invocation, not an incremental timestamp
+           assertion. This SDK-supported, invocation-unique missing output makes
+           CoreCompile run even when changed source bytes retain their mtime. -->
+      <CustomAdditionalCompileOutputs Include="$(IntermediateOutputPath)DarkFogCapture.$(_DarkFogInvocation).missing" />
+    </ItemGroup>
+    <!-- This is the exact reference item list passed to Csc. -->
     <GetAssemblyIdentity AssemblyFiles="@(ReferencePathWithRefAssemblies)">
       <Output TaskParameter="Assemblies" ItemName="_DarkFogReferenceIdentities" />
     </GetAssemblyIdentity>
@@ -23,19 +49,67 @@
       <_DarkFogReferenceFiles Include="%(_DarkFogReferenceIdentities.OriginalItemSpec)">
         <AssemblyIdentity>%(_DarkFogReferenceIdentities.Identity)</AssemblyIdentity>
       </_DarkFogReferenceFiles>
-      <_DarkFogInputFiles Include="@(Compile);@(EmbeddedResource);$(MSBuildAllProjects);$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath)" />
+      <_DarkFogInputFiles Include="$(MSBuildAllProjects);$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath)" />
       <_DarkFogInputFiles Include="$(MSBuildThisFileDirectory)Directory.Build.props" Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.props')" />
       <_DarkFogInputFiles Include="$(MSBuildThisFileDirectory)Local.Build.props" Condition="Exists('$(MSBuildThisFileDirectory)Local.Build.props')" />
+      <_DarkFogGeneratedSources Include="$(TargetFrameworkMonikerAssemblyAttributesPath)" Condition="Exists('$(TargetFrameworkMonikerAssemblyAttributesPath)')" />
+      <_DarkFogGeneratedSources Include="$(GeneratedAssemblyInfoFile)" Condition="Exists('$(GeneratedAssemblyInfoFile)')" />
+      <_DarkFogInventoryRoots Include="$(MSBuildThisFileDirectory)global.json" Condition="Exists('$(MSBuildThisFileDirectory)global.json')" />
+      <_DarkFogInventoryRoots Include="$(MSBuildThisFileDirectory)manifest.json" Condition="Exists('$(MSBuildThisFileDirectory)manifest.json')" />
+      <_DarkFogInventoryRoots Include="$(MSBuildThisFileDirectory)icon.png" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
+      <_DarkFogInventoryRoots Include="$(MSBuildThisFileDirectory).editorconfig" Condition="Exists('$(MSBuildThisFileDirectory).editorconfig')" />
+      <_DarkFogInventoryRoots Include="$(MSBuildThisFileDirectory)Directory.Build.rsp" Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.rsp')" />
+      <_DarkFogInventoryRoots Include="$(MSBuildThisFileDirectory)MSBuild.rsp" Condition="Exists('$(MSBuildThisFileDirectory)MSBuild.rsp')" />
+      <_DarkFogInventoryFiles Include="$(_DarkFogInventoryIncludes);@(_DarkFogInventoryRoots)" Exclude="$(_DarkFogInventoryExcludes)" />
+      <_DarkFogInventoryFiles Include="$(_DarkFogImportIncludes)" Exclude="$(_DarkFogImportExcludes)" />
     </ItemGroup>
+    <RemoveDuplicates Inputs="@(_DarkFogInventoryFiles)">
+      <Output TaskParameter="Filtered" ItemName="_DarkFogUniqueInventory" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_DarkFogEvaluatedInventory)">
+      <Output TaskParameter="Filtered" ItemName="_DarkFogUniqueEvaluatedInventory" />
+    </RemoveDuplicates>
+    <Error Condition="'@(_DarkFogUniqueInventory->'%(FullPath)')' != '@(_DarkFogUniqueEvaluatedInventory->'%(FullPath)')'" Text="Production source inventory changed after project evaluation. Rebuild with stable inputs before recording a candidate." />
     <GetFileHash Files="@(_DarkFogReferenceFiles)" Algorithm="SHA256">
       <Output TaskParameter="Items" ItemName="_DarkFogHashedReferences" />
     </GetFileHash>
     <GetFileHash Files="@(_DarkFogInputFiles)" Algorithm="SHA256">
       <Output TaskParameter="Items" ItemName="_DarkFogHashedInputs" />
     </GetFileHash>
-    <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="@(_DarkFogHashedReferences->'reference|%(FullPath)|%(AssemblyIdentity)|%(FileHash)');@(_DarkFogHashedInputs->'input|%(FullPath)|%(FileHash)')" Encoding="UTF-8" />
+    <GetFileHash Files="@(Compile)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogHashedCompile" />
+    </GetFileHash>
+    <GetFileHash Files="@(EmbeddedResource)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogHashedResources" />
+    </GetFileHash>
+    <GetFileHash Files="@(_DarkFogGeneratedSources)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogHashedGenerated" />
+    </GetFileHash>
+    <GetFileHash Files="@(_DarkFogUniqueInventory)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogHashedInventory" />
+    </GetFileHash>
+    <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="@(_DarkFogHashedReferences->'reference|%(FullPath)|%(AssemblyIdentity)|%(FileHash)');@(_DarkFogHashedInputs->'input|%(FullPath)|%(FileHash)');@(_DarkFogHashedCompile->'compile|%(FullPath)|%(FileHash)');@(_DarkFogHashedResources->'resource|%(FullPath)|%(FileHash)');@(_DarkFogHashedGenerated->'generated|%(FullPath)|%(FileHash)');@(_DarkFogHashedInventory->'inventory|%(FullPath)|%(FileHash)')" Encoding="UTF-8" />
   </Target>
   <Target Name="CompleteDarkFogBuildCapture" AfterTargets="Build" Condition="'$(DarkFogCaptureBuild)' == 'true' And '$(_DarkFogInvocation)' != ''">
+    <!-- Re-evaluate globs: hashing only the previously captured paths would
+         miss additions during the build, which is the original stale-source bug. -->
+    <ItemGroup>
+      <_DarkFogCompletedInventoryRoots Include="$(MSBuildThisFileDirectory)global.json" Condition="Exists('$(MSBuildThisFileDirectory)global.json')" />
+      <_DarkFogCompletedInventoryRoots Include="$(MSBuildThisFileDirectory)manifest.json" Condition="Exists('$(MSBuildThisFileDirectory)manifest.json')" />
+      <_DarkFogCompletedInventoryRoots Include="$(MSBuildThisFileDirectory)icon.png" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
+      <_DarkFogCompletedInventoryRoots Include="$(MSBuildThisFileDirectory).editorconfig" Condition="Exists('$(MSBuildThisFileDirectory).editorconfig')" />
+      <_DarkFogCompletedInventoryRoots Include="$(MSBuildThisFileDirectory)Directory.Build.rsp" Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.rsp')" />
+      <_DarkFogCompletedInventoryRoots Include="$(MSBuildThisFileDirectory)MSBuild.rsp" Condition="Exists('$(MSBuildThisFileDirectory)MSBuild.rsp')" />
+      <_DarkFogCompletedInventoryFiles Include="$(_DarkFogInventoryIncludes);@(_DarkFogCompletedInventoryRoots)" Exclude="$(_DarkFogInventoryExcludes)" />
+      <_DarkFogCompletedInventoryFiles Include="$(_DarkFogImportIncludes)" Exclude="$(_DarkFogImportExcludes)" />
+    </ItemGroup>
+    <RemoveDuplicates Inputs="@(_DarkFogCompletedInventoryFiles)">
+      <Output TaskParameter="Filtered" ItemName="_DarkFogCompletedUniqueInventory" />
+    </RemoveDuplicates>
+    <GetFileHash Files="@(_DarkFogCompletedUniqueInventory)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogCompletedHashedInventory" />
+    </GetFileHash>
+    <Error Condition="'@(_DarkFogHashedInventory->'%(FullPath)|%(FileHash)')' != '@(_DarkFogCompletedHashedInventory->'%(FullPath)|%(FileHash)')'" Text="Production source inventory changed during compilation. Rebuild with stable inputs before recording a candidate." />
     <GetFileHash Files="$(TargetPath)" Algorithm="SHA256">
       <Output TaskParameter="Items" ItemName="_DarkFogBuiltAssembly" />
     </GetFileHash>

@@ -37,7 +37,30 @@ jobs:
           python scripts/validate-content.py
       - name: Verify packaging and release-refusal guards
         run: python scripts/test-packaging.py
+      - name: Verify real compiler capture rejects uncompiled source additions
+        run: python scripts/test-build-capture.py
       - name: Check patch formatting
         run: git show --format= --check HEAD
       - name: State verification boundary
         run: echo 'No game integration, installed-dependency runtime build, save, integrity, or uninstall tests were run by this job.'
+  checkout-assets:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PNG validation dependency
+        run: python -m pip install "Pillow>=10,<13"
+      - name: Verify fresh autocrlf checkouts preserve exact asset bytes
+        run: python scripts/test-checkout-assets.py
+      - uses: actions/setup-dotnet@v4
+        if: runner.os == 'Windows'
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify real Core compiler capture on Windows
+        if: runner.os == 'Windows'
+        run: python scripts/test-build-capture.py

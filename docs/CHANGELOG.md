@@ -55,3 +55,12 @@ No target-game production, discovery, save migration, cleanup, achievement, Meta
 - Added real pinned Harmony pipeline tests on an isolated legacy .NET 6.0.36 host; no game types or disk saves
 - Refused release evidence absent or empty in final frozen ZIP contents, including excluded formats/directories and truncation races
 - Verification: 76 pure tests (17,471 assertions), 16 real-Harmony fixture cases (264 assertions), 57 packaging guards, 15 resource-audit self-tests, clean reference compile and metadata checks; actual game acceptance remains unexecuted
+
+### Checkout bytes and compiler inventory follow-up
+
+- Pinned manifest-hashed source SVGs to LF in Git checkouts and preserved the policy in source packages
+- Added fresh-checkout regressions for all three autocrlf settings without weakening raw-byte/content validation
+- Bound successful compiler captures to complete production membership at evaluation, compiler entry and completion; stale re-recording preserves the prior report
+- Forced actual compilation for each new capture, rejecting preserved-timestamp skipped builds, explicit compiler skipping and unsupported source layouts
+- Added real Core-build and full reference-build mutation/recovery regressions, plus Linux/Windows CI coverage for the new tooling
+- Local verification: 76 pure tests (17,471 assertions), 16 real-Harmony cases (264 assertions), 64 packaging tests, 3 checkout tests, 30 real Core-build assertions, 15 resource-audit self-tests, clean reference compile and metadata audits; native Windows results are reported by CI and game acceptance remains unexecuted

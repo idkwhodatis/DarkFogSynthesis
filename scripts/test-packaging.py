@@ -66,11 +66,12 @@ def candidate_fixture():
                 sidecar = root / "src" / project / "bin/Release" / framework / f"{project}.build-inputs.txt"
                 sidecar.parent.mkdir(parents=True, exist_ok=True)
                 invocation = str(uuid.uuid4())
-                lines = ["schema|1", "invocation|" + invocation, "project|" + project, "configuration|Release",
+                lines = ["schema|2", "invocation|" + invocation, "project|" + project, "configuration|Release",
                          "referenceMode|installed-local", "targetFramework|" + framework, "sdk|8.0.100", "msbuild|17.8.0"]
                 for name, path in refs.items():
                     lines.append(f"reference|{path}|{name}, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null|{package.digest(path)}")
-                lines += [f"input|{code}|{package.digest(code)}", f"output|{paths[project + '.dll']}|{package.digest(paths[project + '.dll'])}", "completed|" + invocation]
+                lines += [f"inventory|{root / name}|{checksum}" for name, checksum in package.production_inventory().items()]
+                lines += [f"compile|{code}|{package.digest(code)}", f"output|{paths[project + '.dll']}|{package.digest(paths[project + '.dll'])}", "completed|" + invocation]
                 sidecar.write_text("\n".join(lines) + "\n")
             plugin_hash = package.digest(paths["DarkFogSynthesis.dll"])
             resource = {"schemaVersion": 1, "satelliteFree": True, "assemblySha256": plugin_hash, "resources": resources}
@@ -515,6 +516,122 @@ class PackagingGuards(unittest.TestCase):
                     sidecar.write_text(content)
                 with self.assertRaises(ValueError):
                     package.validate_release(acceptance_path)
+
+    def test_new_production_members_cannot_rerecord_old_binaries(self):
+        # The inventory includes resource/import extensions excluded from the
+        # source ZIP allowlist, and binds both projects to the same snapshot.
+        additions = ("src/DarkFogSynthesis/NewDefault.cs", "src/DarkFogSynthesis.Core/NewDefault.cs",
+                     "src/DarkFogSynthesis/NewDefault.resx", "src/DarkFogSynthesis/Localization/New.json",
+                     "src/DarkFogSynthesis.Core/unknown.payload",
+                     "src/DarkFogSynthesis.Core/Nested/obj/New.cs", "src/DarkFogSynthesis.Core/Nested/bin/New.cs",
+                     "src/DarkFogSynthesis.Core/__pycache__/New.cs", "src/DarkFogSynthesis.Core/artifacts/New.cs",
+                     "build/imports/new.props",
+                     "build/imports/new.targets", "Local.Build.props", ".editorconfig")
+        for name in additions:
+            with self.subTest(name=name), candidate_fixture() as (root, _, _, _, _, _, rebuild):
+                report = root / "artifacts/build-report.json"
+                before = report.read_bytes()
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("New member after compilation, never compiled")
+                with self.assertRaisesRegex(ValueError, "Production source inventory"):
+                    package.record_build("Release", "installed-local")
+                self.assertEqual(report.read_bytes(), before)
+                with self.assertRaises(ValueError):
+                    package.validate_build("Release")
+                with self.assertRaises(ValueError):
+                    package.package("experimental", "Release", None, root / "refused")
+                self.assertFalse((root / "refused").exists())
+                # A fresh capture, rather than reusing/relabeling a report,
+                # restores eligibility; these remain harmless text fixtures.
+                candidate = rebuild()
+                package.validate_build("Release")
+                self.assertNotEqual(json.loads(before)["buildIdentity"], candidate["buildIdentity"])
+
+    def test_inventory_deletions_and_renames_preserve_previous_report(self):
+        for name in ("src/DarkFogSynthesis.Core/Extra.cs", "src/DarkFogSynthesis/New.resx", "build/extra.targets"):
+            for operation in ("delete", "rename"):
+                with self.subTest(name=name, operation=operation), candidate_fixture() as (root, _, _, _, _, _, rebuild):
+                    path = root / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("An inventory member not individually captured as compile input")
+                    rebuild()
+                    report = root / "artifacts/build-report.json"
+                    before = report.read_bytes()
+                    if operation == "delete":
+                        path.unlink()
+                    else:
+                        path.rename(path.with_name("Renamed" + path.suffix))
+                    with self.assertRaises(ValueError):
+                        package.record_build("Release", "installed-local")
+                    self.assertEqual(report.read_bytes(), before)
+
+    def test_inventory_is_required_for_each_project_even_after_report_relabel(self):
+        for project, framework in (("DarkFogSynthesis", "net472"), ("DarkFogSynthesis.Core", "netstandard2.0")):
+            for mutation in ("legacy-schema", "missing-inventory", "partial-inventory", "duplicate-inventory"):
+                with self.subTest(project=project, mutation=mutation), candidate_fixture() as (root, _, _, _, _, _, _):
+                    report = root / "artifacts/build-report.json"
+                    before = report.read_bytes()
+                    sidecar = root / "src" / project / "bin/Release" / framework / (project + ".build-inputs.txt")
+                    lines = sidecar.read_text().splitlines()
+                    if mutation == "legacy-schema":
+                        lines[0] = "schema|1"
+                    elif mutation == "missing-inventory":
+                        lines = [line for line in lines if not line.startswith("inventory|")]
+                    elif mutation == "partial-inventory":
+                        lines.remove(next(line for line in lines if line.startswith("inventory|")))
+                    else:
+                        lines.append(next(line for line in lines if line.startswith("inventory|")))
+                    sidecar.write_text("\n".join(lines) + "\n")
+                    with self.assertRaises(ValueError):
+                        package.record_build("Release", "installed-local")
+                    self.assertEqual(report.read_bytes(), before)
+
+    def test_unobserved_linked_compiler_sources_and_resources_are_refused(self):
+        for kind in ("compile", "resource"):
+            with self.subTest(kind=kind), candidate_fixture() as (root, _, _, _, _, _, _):
+                linked = root / "tests/Unobserved.cs"
+                linked.parent.mkdir(parents=True)
+                linked.write_text("Harmless unobserved wildcard member fixture")
+                sidecar = root / "src/DarkFogSynthesis/bin/Release/net472/DarkFogSynthesis.build-inputs.txt"
+                with sidecar.open("a") as stream:
+                    stream.write(f"{kind}|{linked}|{package.digest(linked)}\n")
+                with self.assertRaisesRegex(ValueError, "outside the observed production inventory"):
+                    package.record_build("Release", "installed-local")
+
+    def test_arbitrary_generated_source_cannot_bypass_inventory_membership(self):
+        with candidate_fixture() as (root, _, _, _, _, _, _):
+            linked = root / "src/DarkFogSynthesis/obj/Unobserved.cs"
+            linked.parent.mkdir(parents=True)
+            linked.write_text("Not a supported SDK-generated assembly attribute file")
+            sidecar = root / "src/DarkFogSynthesis/bin/Release/net472/DarkFogSynthesis.build-inputs.txt"
+            with sidecar.open("a") as stream:
+                stream.write(f"generated|{linked}|{package.digest(linked)}\ncompile|{linked}|{package.digest(linked)}\n")
+            with self.assertRaisesRegex(ValueError, "Unsupported generated compiler input"):
+                package.record_build("Release", "installed-local")
+
+    def test_inventory_metadata_is_private_and_nonproduction_edits_are_independent(self):
+        with candidate_fixture() as (root, _, _, build, _, _, _):
+            expected = package.inventory_fingerprint(package.production_inventory())
+            for captured in build["compilerInputs"].values():
+                self.assertEqual(captured["sourceInventorySha256"], expected)
+            self.assertNotIn(str(root), json.dumps(build))
+            for name in ("docs/extra.md", "docs/compatibility/evidence/extra.txt", "tests/Extra.cs",
+                         "scripts/extra.py", ".gitattributes", "src/DarkFogSynthesis/obj/ignored.cs",
+                         "src/DarkFogSynthesis/bin/ignored.txt"):
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("Nonproduction or generated file")
+            self.assertEqual(expected, package.inventory_fingerprint(package.production_inventory()))
+            package.validate_build("Release")
+
+    def test_production_inventory_reuses_frozen_packaged_bytes(self):
+        with candidate_fixture() as (root, _, _, _, _, _, _):
+            snapshot = package.freeze_sources()
+            before = package.production_inventory(snapshot)
+            (root / "src/Fixture.cs").write_text("Later live source content")
+            self.assertEqual(before, package.production_inventory(snapshot))
+            self.assertNotEqual(before, package.production_inventory())
 
     def test_report_cannot_substitute_other_reference_or_build_identity(self):
         for field in ("references", "buildIdentity", "compilerInputs"):
