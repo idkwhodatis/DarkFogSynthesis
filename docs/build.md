@@ -4,6 +4,8 @@
 
 The plugin compiles against `net472`; Core is `netstandard2.0`; the pure-test executable is `net8.0`. Install the official .NET SDK appropriate for those projects. The .NET Framework reference-assembly package is a compile-time NuGet dependency, not a substitute for a lawful game installation.
 
+`global.json` selects the .NET 8 SDK and permits newer .NET 8 feature bands. This prevents a runner with SDK 10 installed from silently compiling `LangVersion=latest` using a different language version. The SDK pin is included in source packages and build fingerprints; CI prints `dotnet --info` before tests.
+
 `Directory.Build.props` imports the ignored `Local.Build.props`. Copy `Local.Build.props.example` and set:
 
 | Property | Meaning |

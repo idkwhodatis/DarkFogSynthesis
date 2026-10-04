@@ -14,7 +14,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 OWN_DLLS = ("DarkFogSynthesis.dll", "DarkFogSynthesis.Core.dll")
 CHECK_IDS = tuple(f"{prefix}{n:02}" for prefix, count in (("D", 4), ("R", 6), ("T", 6), ("S", 7), ("U", 5), ("I", 3), ("C", 3), ("V", 1)) for n in range(1, count + 1))
-TOP_FILES = ("README.md", "LICENSE", "manifest.json", "icon.png", "Directory.Build.props", "Local.Build.props.example", ".gitignore", "DarkFogSynthesis_Implementation_Plan_ZH.md")
+TOP_FILES = ("README.md", "LICENSE", "manifest.json", "icon.png", "Directory.Build.props", "Local.Build.props.example", "global.json", ".gitignore", "DarkFogSynthesis_Implementation_Plan_ZH.md")
 SOURCE_ROOTS = ("src", "tests", "scripts", "docs", "assets", ".github")
 SOURCE_EXTENSIONS = {".cs", ".csproj", ".md", ".json", ".ps1", ".py", ".svg", ".png", ".yml", ".yaml", ".txt"}
 
@@ -43,7 +43,7 @@ def source_fingerprint() -> str:
     # Evidence and docs change during acceptance; bind provenance to build inputs.
     entries = []
     for name, path in source_files().items():
-        if name.startswith(("src/", "assets/source/", "assets/generated/")) or name in {"Directory.Build.props", "manifest.json"}:
+        if name.startswith(("src/", "assets/source/", "assets/generated/")) or name in {"Directory.Build.props", "manifest.json", "global.json"}:
             entries.append(f"{name}\0{digest(path)}\n")
     return hashlib.sha256("".join(entries).encode("utf-8")).hexdigest()
 

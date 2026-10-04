@@ -164,7 +164,7 @@ namespace DarkFogSynthesis.Core.Tests
                 var snapshot = changed.ToArray();
                 True(!NativeMatrixContract.IsSupported(changed)); Sequence(snapshot,changed);
             }
-            True(!NativeMatrixContract.IsSupported(ids.Reverse().ToArray()));
+            True(!NativeMatrixContract.IsSupported(Enumerable.Reverse(ids).ToArray()));
             True(!NativeMatrixContract.IsSupported(ids.Concat(new[] {6007}).ToArray()));
             Sequence(before,ids);
         }

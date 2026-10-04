@@ -170,6 +170,8 @@ class PackagingGuards(unittest.TestCase):
             second = package.package("source-only", "Release", None, Path(tmp) / "two")
             self.assertEqual(first.read_bytes(), second.read_bytes())
             with zipfile.ZipFile(first) as archive:
+                sdk_file = next(name for name in archive.namelist() if name.endswith('/global.json'))
+                self.assertEqual('8.0.100', json.loads(archive.read(sdk_file))['sdk']['version'])
                 status = json.loads(archive.read("PACKAGE-STATUS.json"))
                 self.assertFalse(status["installable"])
                 self.assertFalse(status["releaseAcceptanceValidated"])

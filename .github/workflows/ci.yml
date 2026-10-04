@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Confirm pinned build SDK
+        run: dotnet --info
       - name: Pure logic and frozen specification tests (no game DLLs)
         run: dotnet run --project tests/DarkFogSynthesis.Core.Tests -c Release
       - name: Regression-test compiled resource audit
