@@ -36,9 +36,11 @@ namespace DarkFogSynthesis
             reason => { status = "BLOCKED: " + reason; confirmRemoval = false; showDiagnostics = true; },
             error => Logger.LogError(error));
         internal RuntimeProgression Progression { get; private set; } = null!;
-        internal bool Ready => registry?.Ready == true && StartupGuardEntrypoints.State.AllowsGameOperations && !compatibility.IsBlocked && !SafeRemovalService.IsQuarantined;
+        internal bool Ready => registry?.Ready == true && !IsPersistenceBlocked && !SafeRemovalService.IsQuarantined;
         internal bool IsCompatibilityBlocked => compatibility.IsBlocked;
-        internal bool IsPersistenceBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || compatibility.IsBlocked;
+        internal bool IsPersistenceBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || !compatibility.CanPersist(GameMain.data);
+        // Preserve native Begin's existing resume behavior; persistence has a stricter identity gate.
+        internal bool IsResumeBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || compatibility.IsBlocked;
         private string? BlockingReason => fatal ?? compatibility.BlockReason;
         private Harmony harmony = null!;
         private ConfigEntry<bool>? nonPeaceSetting;
@@ -108,9 +110,9 @@ namespace DarkFogSynthesis
         internal void EnsureReady()
         {
             EnsureRegistryReady();
-            if (compatibility.IsBlocked || SafeRemovalService.IsQuarantined)
+            if (IsPersistenceBlocked || SafeRemovalService.IsQuarantined)
                 throw new InvalidOperationException("DarkFogSynthesis cannot safely use this session: " +
-                    (compatibility.BlockReason ?? "this removal-candidate session is quarantined; load a different valid session"));
+                    (compatibility.BlockReason ?? "this session is not fully validated or is removal-quarantined; load a different valid session"));
         }
 
         // Preparing a replacement must remain possible while the old session's block is latched.
@@ -139,6 +141,8 @@ namespace DarkFogSynthesis
 
         internal void BeginSession(GameData data) => compatibility.BeginSession(data);
         internal void EnsureSessionCanBegin(GameData data) => compatibility.EnsureCanBegin(data);
+        internal object BeginSessionValidation(GameData data) => compatibility.BeginValidation(data);
+        internal void EndSessionValidation(object? token) => compatibility.EndValidation(token);
         internal void EndSession(GameData data) => compatibility.EndSession(data);
         internal void CompleteValidatedSession(GameData data)
         {

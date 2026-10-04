@@ -101,11 +101,13 @@ def candidate_fixture():
             yield root, paths, refs, build, acceptance, acceptance_path, rebuild
 
 
-def candidate_cli(root, paths, acceptance, output_dir, *, cwd):
+def candidate_cli(root, paths, acceptance, output_dir, *, cwd, evidence_mutations=()):
     """Run the real CLI parser and packager in a fresh process on text fixtures.
 
     As in candidate_fixture, only runtime-output discovery is substituted. The
     subprocess still runs every provenance, acceptance, asset and ZIP guard.
+    Optional race injection changes only an evidence fixture after a real
+    validator returns; it never replaces a guard or creates game evidence.
     Nothing here creates an actual runtime build or target-game test result.
     """
     bootstrap = """
@@ -117,11 +119,21 @@ import package
 package.ROOT = Path(sys.argv[2])
 paths = {name: Path(path) for name, path in json.loads(sys.argv[3]).items()}
 package.runtime_paths = lambda configuration: paths
-sys.argv = [package.__file__, *sys.argv[4:]]
+def inject_evidence_mutation(phase, relative, replacement):
+    original = getattr(package, phase)
+    def validate_then_mutate(*args, **kwargs):
+        result = original(*args, **kwargs)
+        (package.ROOT / relative).write_text(replacement)
+        return result
+    setattr(package, phase, validate_then_mutate)
+for mutation in json.loads(sys.argv[4]):
+    inject_evidence_mutation(*mutation)
+sys.argv = [package.__file__, *sys.argv[5:]]
 raise SystemExit(package.main())
 """
     return subprocess.run([sys.executable, "-c", bootstrap, str(Path(package.__file__).parent),
                            str(root), json.dumps({name: str(path) for name, path in paths.items()}),
+                           json.dumps(evidence_mutations),
                            "--channel", "release", "--acceptance", str(acceptance),
                            "--output-dir", str(output_dir)], cwd=cwd, capture_output=True, text=True)
 
@@ -275,6 +287,111 @@ class PackagingGuards(unittest.TestCase):
             self.assertIn("Packaging refused: Release blocked:", result.stderr)
             self.assertNotIn("Traceback", result.stderr)
             self.assertFalse(output.exists())
+
+    def test_release_cli_refuses_evidence_omitted_by_source_allowlist(self):
+        excluded = [f"review.{extension}" for extension in ("log", "jpg", "jpeg", "dll", "exe", "dsv", "moddsv", "zip")]
+        excluded += [f"{folder}/review.txt" for folder in ("bin", "obj", "__pycache__", ".git")]
+        # Exact report references must be ZIP/inventory keys, not aliases.
+        excluded += ["./guard-fixture.txt"]
+        with candidate_fixture() as (root, paths, _, _, acceptance, acceptance_path, _):
+            for index, name in enumerate(excluded):
+                with self.subTest(evidence=name):
+                    relative = "docs/compatibility/evidence/" + name
+                    evidence = root / relative
+                    evidence.parent.mkdir(parents=True, exist_ok=True)
+                    evidence.write_text("Ordinary omitted-file fixture; not target-game evidence.")
+                    changed = copy.deepcopy(acceptance)
+                    # A valid first reference must not hide an omitted later one.
+                    changed["checks"][-1]["evidence"].append(relative)
+                    acceptance_path.write_text(json.dumps(changed))
+                    output = root / "out" / str(index)
+                    result = candidate_cli(root, paths, acceptance_path, output, cwd=root)
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn("absent from the final allowlisted package inventory", result.stderr)
+                    self.assertIn(relative, result.stderr)
+                    self.assertFalse(output.exists())
+
+    def test_release_cli_preserves_every_evidence_reference_and_inventory_hash(self):
+        with candidate_fixture() as (root, paths, _, _, acceptance, acceptance_path, _):
+            expected = {acceptance["checks"][0]["evidence"][0]: b"Repeated ordinary text fixture, not game evidence."}
+            for name, content in (("notes.md", b"# Ordinary fixture"), ("data.json", b'{"fixture":true}'),
+                                  ("nested/capture.png", DISTRIBUTION_FIXTURE["icon.png"]), ("upper.TXT", b"Uppercase extension fixture")):
+                expected["docs/compatibility/evidence/" + name] = content
+            for relative, content in expected.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            acceptance["checks"][-1]["evidence"] = list(expected)
+            acceptance_path.write_text(json.dumps(acceptance))
+            output = root / "out"
+            result = candidate_cli(root, paths, acceptance_path, output, cwd=root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            with zipfile.ZipFile(output / "DarkFogSynthesis-0.1.0-release.zip") as archive:
+                report = json.loads(archive.read("RELEASE-ACCEPTANCE.json"))
+                status = json.loads(archive.read("PACKAGE-STATUS.json"))
+                self.assertTrue(status["releaseAcceptanceValidated"])
+                for check in report["checks"]:
+                    for relative in check["evidence"]:
+                        self.assertEqual(archive.namelist().count(relative), 1)
+                        self.assertEqual(archive.read(relative), expected[relative])
+                        self.assertTrue(archive.read(relative))
+                        self.assertEqual(status["files"][relative], package.hashlib.sha256(expected[relative]).hexdigest())
+
+    def test_release_cli_refuses_evidence_truncated_after_validation_before_freeze(self):
+        for repair_live_file in (False, True):
+            with self.subTest(repair_live_file=repair_live_file), candidate_fixture() as (root, paths, _, _, acceptance, acceptance_path, _):
+                relative = acceptance["checks"][0]["evidence"][0]
+                mutations = [("validate_release", relative, "")]
+                if repair_live_file:
+                    mutations.append(("validate_asset_snapshot", relative, "Repaired live file, but the frozen evidence is empty"))
+                output = root / "out"
+                result = candidate_cli(root, paths, acceptance_path, output, cwd=root, evidence_mutations=mutations)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("Empty frozen release evidence", result.stderr)
+                self.assertEqual((root / relative).read_text(), mutations[-1][2])
+                self.assertFalse(output.exists())
+
+    def test_release_cli_uses_frozen_evidence_despite_later_truncation_or_edit(self):
+        for replacement in ("", "Different later checkout bytes"):
+            with self.subTest(replacement=replacement), candidate_fixture() as (root, paths, _, _, acceptance, acceptance_path, _):
+                relative = acceptance["checks"][0]["evidence"][0]
+                expected = (root / relative).read_bytes()
+                output = root / "out"
+                result = candidate_cli(root, paths, acceptance_path, output, cwd=root,
+                                       evidence_mutations=[("validate_asset_snapshot", relative, replacement)])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual((root / relative).read_text(), replacement)
+                with zipfile.ZipFile(output / "DarkFogSynthesis-0.1.0-release.zip") as archive:
+                    self.assertEqual(archive.read(relative), expected)
+                    status = json.loads(archive.read("PACKAGE-STATUS.json"))
+                    self.assertEqual(status["files"][relative], package.hashlib.sha256(expected).hexdigest())
+
+    def test_release_cli_preserves_evidence_path_and_nonempty_guards(self):
+        with candidate_fixture() as (root, paths, _, _, acceptance, acceptance_path, _):
+            evidence = root / acceptance["checks"][0]["evidence"][0]
+            empty = evidence.with_name("empty.txt")
+            empty.write_bytes(b"")
+            linked = evidence.with_name("linked.txt")
+            cases = (
+                ("docs/compatibility/evidence/missing.txt", "Missing or non-file"),
+                (empty.relative_to(root).as_posix(), "Missing release evidence"),
+                ("docs/CHANGELOG.md", "must be beneath"),
+                ("docs/compatibility/evidence/../evidence/guard-fixture.txt", "must be beneath"),
+                (str(evidence), "must be beneath"),
+                (linked.relative_to(root).as_posix(), "Symlink"),
+            )
+            for index, (relative, refusal) in enumerate(cases):
+                with self.subTest(evidence=relative):
+                    if relative == linked.relative_to(root).as_posix():
+                        linked.symlink_to(evidence)
+                    changed = copy.deepcopy(acceptance)
+                    changed["checks"][-1]["evidence"].append(relative)
+                    acceptance_path.write_text(json.dumps(changed))
+                    output = root / "out" / str(index)
+                    result = candidate_cli(root, paths, acceptance_path, output, cwd=root)
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn(refusal, result.stderr)
+                    self.assertFalse(output.exists())
 
     def test_release_cli_rejects_symlinked_and_outside_acceptance_paths(self):
         with candidate_fixture() as (root, paths, _, _, _, acceptance_path, _), tempfile.TemporaryDirectory() as tmp:

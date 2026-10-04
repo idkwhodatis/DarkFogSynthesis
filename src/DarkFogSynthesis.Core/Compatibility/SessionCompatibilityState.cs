@@ -14,16 +14,39 @@ namespace DarkFogSynthesis.Core.Compatibility
         private readonly HashSet<object> blockedSessions = new HashSet<object>(SessionIdentityComparer.Instance);
         private object? pendingSession;
         private object? validatedSession;
+        private object? activeBeginToken;
 
         public string? BlockReason { get; private set; }
         public bool IsBlocked => BlockReason != null;
 
+        /// <summary>Ordinary persistence requires completed validation of this exact live identity.</summary>
+        public bool CanPersist(object? session) => session != null && !IsBlocked && pendingSession == null && activeBeginToken == null &&
+            ReferenceEquals(validatedSession, session);
+
         public void BeginSession(object session)
         {
             if (session == null) throw new ArgumentNullException(nameof(session));
+            if (activeBeginToken != null)
+                throw new InvalidOperationException("Nested session initialization during native Begin validation is unsupported.");
             if (blockedSessions.Contains(session))
                 throw new InvalidOperationException("This session is compatibility-blocked. Load a different valid session before continuing. " + BlockReason);
             pendingSession = session;
+        }
+
+        /// <summary>Start one native Begin pipeline; repeated calls must revalidate, nested calls fail closed.</summary>
+        public object BeginValidation(object session)
+        {
+            EnsureCanBegin(session);
+            if (activeBeginToken != null)
+                throw new InvalidOperationException("Nested native Begin validation is unsupported.");
+            pendingSession = session;
+            return activeBeginToken = new object();
+        }
+
+        /// <summary>Only the owning invocation may release its in-flight barrier.</summary>
+        public void EndValidation(object? token)
+        {
+            if (token != null && ReferenceEquals(activeBeginToken, token)) activeBeginToken = null;
         }
 
         /// <summary>Reject stale/blocked Begin calls before native initialization side effects.</summary>
@@ -65,7 +88,13 @@ namespace DarkFogSynthesis.Core.Compatibility
         public void EndSession(object session)
         {
             if (session == null) throw new ArgumentNullException(nameof(session));
-            if (ReferenceEquals(pendingSession, session)) pendingSession = null;
+            if (ReferenceEquals(pendingSession, session))
+            {
+                pendingSession = null;
+                // Abandoning a replacement must not resurrect the previous validation after
+                // shared progression may already have been restored/changed for the new load.
+                validatedSession = null;
+            }
             if (ReferenceEquals(validatedSession, session)) validatedSession = null;
         }
 

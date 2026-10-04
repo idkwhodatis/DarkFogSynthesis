@@ -29,41 +29,59 @@ namespace DarkFogSynthesis.Compatibility
         private static readonly object SaveGate = new object();
         [ThreadStatic] private static string? permittedSaveName;
 
-        [HarmonyPatch]
         private static class SaveWriteGuard
         {
-            [HarmonyTargetMethods]
-            private static IEnumerable<MethodBase> Targets() => new[] {
-                AccessTools.Method(typeof(GameSave), nameof(GameSave.SaveCurrentGame)),
-                AccessTools.Method(typeof(GameSave), nameof(GameSave.AutoSave)),
-                AccessTools.Method(typeof(GameSave), nameof(GameSave.AutoSaveAfterErrored)),
-                AccessTools.Method(typeof(GameSave), nameof(GameSave.SaveAsLastExit)) };
-
-            [HarmonyPrefix, HarmonyPriority(Priority.First)]
-            private static bool BeginSave(MethodBase __originalMethod, object[] __args, ref bool __result, out bool __state)
+            internal static bool BeginSave(bool isNamedSave, string? requestedName, ref bool result, out bool state)
             {
-                __state = false;
+                state = false;
                 lock (SaveGate)
                 {
                     // The independent critical prefix already rejects fatal/incomplete startup. Keep this
                     // maintenance barrier fail-closed too; compatibility alone does not include init failure.
-                    if (Plugin.Instance == null || Plugin.Instance.IsPersistenceBlocked)
-                    { __result = false; return false; }
-                    if ((cleaning || quarantinedSession != null) && (__originalMethod.Name != nameof(GameSave.SaveCurrentGame) || __args.Length != 1 ||
-                        permittedSaveName == null || !string.Equals(__args[0] as string, permittedSaveName, StringComparison.Ordinal)))
-                    { __result = false; return false; }
+                    if (!SessionPersistencePolicy.AllowsWrite(Plugin.Instance != null && !Plugin.Instance.IsPersistenceBlocked,
+                        cleaning || quarantinedSession != null, isNamedSave, requestedName, permittedSaveName))
+                    { result = false; return false; }
                     ++writesInProgress;
-                    __state = true;
+                    state = true;
                     return true;
                 }
             }
 
-            [HarmonyFinalizer]
-            private static Exception? EndSave(bool __state, Exception? __exception)
+            internal static Exception? EndSave(bool state, Exception? error)
             {
-                if (__state) lock (SaveGate) --writesInProgress;
-                return __exception;
+                if (state) lock (SaveGate) --writesInProgress;
+                return error;
             }
+        }
+
+        // HarmonyX 2.7.0 does not implement __args injection. Use exact supported signatures,
+        // with each prefix/finalizer pair sharing its own declaring-type __state slot.
+        [HarmonyPatch(typeof(GameSave), nameof(GameSave.SaveCurrentGame), new[] { typeof(string) })]
+        private static class NamedSaveWriteGuard
+        {
+            [HarmonyPrefix, HarmonyPriority(Priority.First)]
+            private static bool BeginSave(string __0, ref bool __result, out bool __state) =>
+                SaveWriteGuard.BeginSave(true, __0, ref __result, out __state);
+
+            [HarmonyFinalizer]
+            private static Exception? EndSave(bool __state, Exception? __exception) => SaveWriteGuard.EndSave(__state, __exception);
+        }
+
+        [HarmonyPatch]
+        private static class AutomaticSaveWriteGuard
+        {
+            [HarmonyTargetMethods]
+            private static IEnumerable<MethodBase> Targets() => new[] {
+                AccessTools.Method(typeof(GameSave), nameof(GameSave.AutoSave), Type.EmptyTypes),
+                AccessTools.Method(typeof(GameSave), nameof(GameSave.AutoSaveAfterErrored), Type.EmptyTypes),
+                AccessTools.Method(typeof(GameSave), nameof(GameSave.SaveAsLastExit), Type.EmptyTypes) };
+
+            [HarmonyPrefix, HarmonyPriority(Priority.First)]
+            private static bool BeginSave(ref bool __result, out bool __state) =>
+                SaveWriteGuard.BeginSave(false, null, ref __result, out __state);
+
+            [HarmonyFinalizer]
+            private static Exception? EndSave(bool __state, Exception? __exception) => SaveWriteGuard.EndSave(__state, __exception);
         }
 
         [HarmonyPatch(typeof(GameMain), nameof(GameMain.Resume))]
@@ -71,7 +89,7 @@ namespace DarkFogSynthesis.Compatibility
         {
             [HarmonyPrefix]
             private static bool BeforeResume() => !IsQuarantined &&
-                Plugin.Instance != null && !Plugin.Instance.IsPersistenceBlocked;
+                Plugin.Instance != null && !Plugin.Instance.IsResumeBlocked;
         }
 
         internal static void OnNewSession(GameData data)

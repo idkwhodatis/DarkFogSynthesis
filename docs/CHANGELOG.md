@@ -46,3 +46,12 @@ No target-game production, discovery, save migration, cleanup, achievement, Meta
 - Normalized empty/throwing exception messages and guaranteed abort restoration/transition cleanup despite broken diagnostics
 - Canonicalized acceptance paths after safety checks; added actual CLI relative/absolute-path regressions and retained release refusal
 - Verification: 75 pure tests (17,380 assertions), 52 packaging guards, 15 resource-audit self-tests, clean reference compilation and metadata audits; no target-game execution
+
+### Native Begin completion and evidence inventory follow-up
+
+- Required an executed original Begin and an owning validation token before session completion; rejected nested Begin and kept pending/repeated/abandoned sessions unwritable
+- Preserved exact named maintenance exceptions while requiring the current validated identity and completed startup
+- Replaced unsupported HarmonyX 2.7 `__args` save injection with supported named/no-argument prefix and paired-finalizer signatures
+- Added real pinned Harmony pipeline tests on an isolated legacy .NET 6.0.36 host; no game types or disk saves
+- Refused release evidence absent or empty in final frozen ZIP contents, including excluded formats/directories and truncation races
+- Verification: 76 pure tests (17,471 assertions), 16 real-Harmony fixture cases (264 assertions), 57 packaging guards, 15 resource-audit self-tests, clean reference compile and metadata checks; actual game acceptance remains unexecuted

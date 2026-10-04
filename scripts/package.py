@@ -378,10 +378,24 @@ def validate_release(acceptance_path: Path | None, configuration: str = "Release
             full = project_path(ROOT / path)
             if full.stat().st_size == 0:
                 raise ValueError(f"Missing release evidence: {relative}")
-    print("Release acceptance fields and evidence files validated; their factual correctness remains the tester's responsibility.")
     # Retain exactly what was validated. The packager must not re-read another
     # build/acceptance report and silently treat it as this validated candidate.
     return paths, candidate, candidate_bytes, report, acceptance_bytes
+
+
+def validate_release_evidence_inventory(report: dict, contents: dict[str, bytes]) -> None:
+    """Bind every evidence reference to the exact bytes that will enter the ZIP.
+
+    The earlier filesystem checks cannot establish archive membership or size:
+    the source allowlist may omit a file, or it may change before freezing.
+    Never add excluded files or re-read the mutable checkout to satisfy this gate.
+    """
+    for check in report["checks"]:
+        for relative in check["evidence"]:
+            if relative not in contents:
+                raise ValueError(f"Release evidence is absent from the final allowlisted package inventory: {relative}")
+            if not contents[relative]:
+                raise ValueError(f"Empty frozen release evidence: {relative}")
 
 
 def publish_archive(contents: dict[str, bytes], notice: dict, target: Path) -> str:
@@ -477,6 +491,9 @@ def package(channel: str, configuration: str, acceptance: Path | None, output_di
                 or (accepted_report is not None and (contents["RELEASE-ACCEPTANCE.json"] != acceptance_bytes
                     or accepted_report["testedBuild"] != tested_build(candidate)))):
             raise ValueError("Build/acceptance evidence changed while packaging; retry after the inputs are stable.")
+    if accepted_report is not None:
+        validate_release_evidence_inventory(accepted_report, contents)
+        print("Release acceptance fields and frozen package evidence validated; their factual correctness remains the tester's responsibility.")
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / f"DarkFogSynthesis-{manifest['version_number']}-{channel}.zip"
     notice = {

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "purpose": "Harmless-method compatibility characterization; not game or save-file acceptance evidence",
+  "observedOn": "2026-10-04",
+  "buildSdk": "8.0.425",
+  "executionFramework": "Microsoft.NETCore.App 6.0.36",
+  "executionRid": "linux-x64",
+  "runtime": {
+    "downloadUrl": "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-linux-x64.tar.gz",
+    "releaseMetadataUrl": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/6.0/releases.json",
+    "tarGzSha256": "18f90612188f34d95af8c87557554a156e24dbf83d2878320e3a217e02f5453d",
+    "dotnetHostSha256": "6206ebc1d4b6fb5d73311bc7571c654451550e446daf39fe7cfd3cd84bd6da36",
+    "coreClrSha256": "a7b36af700df8034bec7101e365a471e471a0010e5b41caec4d252c88bd13839",
+    "coreLibSha256": "ea13c7eca6fbc6e2a554917784bc6ec70165f6dda803a258def7c7a9cd294f81",
+    "tarGzSha512": "afb6018fcabec468ccd7ae2f1131d8c9de7f4de7645b8f0c223efbbdbfdc515fb0642a399ebfe372c02044416c4cae463c9c802cd156b9da4181efff0e33ee94",
+    "officialReleaseSha512Verified": true
+  },
+  "packages": [
+    {
+      "id": "HarmonyX",
+      "version": "2.7.0",
+      "packageSha256": "8e3366d6eedbc22cd4280eeb9d3f948c37db474132f8635c8eb0954c46e1efc1",
+      "selectedAsset": "lib/netstandard2.0/0Harmony.dll",
+      "assemblySha256": "5dbeca82ceffd8888a2db2c518f6d10fa84091f5ee2ed6f2a965206d45fb05cf"
+    },
+    {
+      "id": "MonoMod.RuntimeDetour",
+      "version": "21.12.13.1",
+      "packageSha256": "68ca96976a110c1484f9e29c674bcbf28bba23843fc47e5731e4f75c31283224",
+      "selectedAsset": "lib/net5.0/MonoMod.RuntimeDetour.dll",
+      "assemblySha256": "8f66e536a1bfc2cbc73c862bb0b305bddc33a6122b23674dc413573a57250347"
+    },
+    {
+      "id": "MonoMod.Utils",
+      "version": "21.12.13.1",
+      "packageSha256": "f4f63c2d4e7acde9ba4b1d58b67b1b6b5ff6313b9b586e1f70cc2ec93d9594f9",
+      "selectedAsset": "lib/net5.0/MonoMod.Utils.dll",
+      "assemblySha256": "a5b752a2af32ec1f050dbc2854f4b032ce9d33cc19e75ecf48af13bf24687e26"
+    },
+    {
+      "id": "Mono.Cecil",
+      "version": "0.11.4",
+      "packageSha256": "1eb9d1805b0ecdfa805b0d1f5318bfbe4cd977c74c9f9cee79478b41603daafb",
+      "selectedAsset": "lib/netstandard2.0/Mono.Cecil.dll",
+      "assemblySha256": "769a59793d4b8885bbbfbc5aee8f57a0d4e34d275c56c60c03994309b87f67e9"
+    }
+  ]
+}

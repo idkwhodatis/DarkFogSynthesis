@@ -13,11 +13,17 @@ jobs:
           fetch-depth: 2
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            6.0.428
       - name: Confirm pinned build SDK
         run: dotnet --info
       - name: Pure logic and frozen specification tests (no game DLLs)
         run: dotnet run --project tests/DarkFogSynthesis.Core.Tests -c Release
+      - name: Exact HarmonyX lifecycle pipeline (isolated managed fixtures, no DSP)
+        run: |
+          dotnet restore tests/DarkFogSynthesis.Harmony.Tests --locked-mode
+          dotnet run --project tests/DarkFogSynthesis.Harmony.Tests -c Release --no-restore
       - name: Regression-test compiled resource audit
         run: dotnet run --project scripts/ResourceAudit -c Release -- --self-test
       - uses: actions/setup-python@v5

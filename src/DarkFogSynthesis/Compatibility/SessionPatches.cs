@@ -1,4 +1,5 @@
 using System;
+using DarkFogSynthesis.Core.Compatibility;
 using HarmonyLib;
 
 namespace DarkFogSynthesis.Compatibility
@@ -96,15 +97,18 @@ namespace DarkFogSynthesis.Compatibility
                 SaveReconciler.Reconcile(__instance.history);
         }
 
-        [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyPrefix, HarmonyPriority(Priority.First)]
-        private static void BeforeBegin()
+        [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyPrefix, HarmonyPriority(int.MaxValue)]
+        private static void BeforeBegin(out object? __state)
         {
+            __state = null;
             Plugin.Instance.EnsureRegistryReady();
             // Do not repair a late/unrecognized path after native history/queue initialization already ran.
             if (!ReferenceEquals(session, GameMain.data) || !sessionPeaceMode.HasValue ||
                 GameMain.data.gameDesc == null || sessionPeaceMode.Value != GameMain.data.gameDesc.isPeaceMode)
                 throw new InvalidOperationException("Unsupported or changed session initialization order. The mode policy must be applied before history/queue initialization.");
-            Plugin.Instance.EnsureSessionCanBegin(GameMain.data);
+            // Repeated Begin must not reuse a previous validation while native/postfix callbacks run.
+            // A nested invocation gets no ticket and cannot complete or release its caller's barrier.
+            __state = Plugin.Instance.BeginSessionValidation(GameMain.data);
             Plugin.Instance.ValidateActiveProgression(GameMain.data);
             Plugin.Instance.ValidateLoadedMachines(GameMain.data);
             SaveReconciler.Reconcile(GameMain.data.history);
@@ -115,25 +119,21 @@ namespace DarkFogSynthesis.Compatibility
         private static void OnSessionDestroyed(GameData __instance) => RestoreSession(__instance);
 
         [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyFinalizer, HarmonyPriority(Priority.Last)]
-        private static Exception? BeginFailed(Exception? __exception)
+        private static Exception? BeginFailed(object? __state, bool __runOriginal, Exception? __exception)
         {
             // All original/postfix work must finish before a replacement can release either latch.
             // In particular, a foreign late postfix may disable required technologies or replace lab hooks.
-            if (__exception == null)
+            if (__state == null && __exception == null)
+                __exception = new InvalidOperationException("Native Begin has no matching validation entry. This session cannot be promoted.");
+            try
             {
-                try
-                {
-                    if (!Plugin.Instance.DiagnoseLateConflicts()) return null;
-                    Plugin.Instance.CompleteValidatedSession(GameMain.data);
-                    SafeRemovalService.OnNewSession(GameMain.data);
-                }
-                catch (Exception error) { __exception = error; }
+                return SessionBeginCompletion.Finish(__runOriginal, __exception,
+                    () => Plugin.Instance.DiagnoseLateConflicts(), () => {
+                        Plugin.Instance.CompleteValidatedSession(GameMain.data);
+                        SafeRemovalService.OnNewSession(GameMain.data);
+                    }, error => Plugin.Instance.AbortSession(GameMain.data, error));
             }
-            if (__exception != null)
-            {
-                Plugin.Instance.AbortSession(GameMain.data, __exception);
-            }
-            return __exception;
+            finally { Plugin.Instance.EndSessionValidation(__state); }
         }
 
         private static void BeginTransition(GameData data)

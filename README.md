@@ -32,6 +32,14 @@ python scripts/validate-content.py
 dotnet run --project tests/DarkFogSynthesis.Core.Tests -c Release
 ```
 
+The separate real-Harmony lifecycle harness requires the isolated .NET **6.0.36** runtime (included in SDK **6.0.428**) in addition to the pinned .NET 8 build SDK:
+
+```sh
+dotnet run --project tests/DarkFogSynthesis.Harmony.Tests -c Release
+```
+
+It patches harmless managed fixture methods with the exact legacy HarmonyX 2.7.0/MonoMod dependency pair; it never loads DSP. Our Linux .NET 8 probe crashed with that pair, so this harness uses the separately tested .NET 6 host. .NET 6 is end-of-support and is used only in this bounded compatibility-test process, never bundled or required by the game plugin. CI runs both test suites. This is hook-order evidence, not game/save acceptance.
+
 For a runtime build, copy `Local.Build.props.example` to `Local.Build.props` and edit paths to your **own lawful installation**. `DSPGameDir` is the game installation root; `DSPManagedDir` points to its `DSPGAME_Data/Managed` directory. `BepInExDir` points to the directory containing `BepInEx.dll` and `0Harmony.dll` (normally the isolated profile's `BepInEx/core`); `CommonApiDir` and `LdbToolDir` point to the directories containing those installed plugin DLLs. The template's paths are examples, not detected locations.
 
 ```powershell
@@ -72,7 +80,7 @@ Peace Mode always adds the four agreed combat prerequisites to the four vanilla 
 
 ## Verification and removal / 验收与卸载
 
-[Existing-mod source comparison](docs/compatibility/mod-source-comparison.md) · [Review regressions](docs/compatibility/review-regressions.md) · [Startup/progression/package follow-up](docs/compatibility/startup-progress-packaging-review.md) · [Bounded performance review](docs/compatibility/performance-review.md) · [Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)
+[Existing-mod source comparison](docs/compatibility/mod-source-comparison.md) · [Review regressions](docs/compatibility/review-regressions.md) · [Startup/progression/package follow-up](docs/compatibility/startup-progress-packaging-review.md) · [Session completion and evidence review](docs/compatibility/session-completion-evidence-review.md) · [Bounded performance review](docs/compatibility/performance-review.md) · [Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)
 
 **Do not assume deleting the DLL is safe.** Active machines, research/crafting queues and blueprints may retain custom IDs. A fully validated “Prepare a Vanilla-Compatible Save” operation is not currently established. Retain or restore the untouched pre-Mod backup for ordinary play; do not overwrite it with experimental saves. 不能将“产物全是原版物品”视为安全卸载证明。
 
