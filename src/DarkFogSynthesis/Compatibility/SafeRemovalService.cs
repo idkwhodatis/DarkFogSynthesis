@@ -45,7 +45,9 @@ namespace DarkFogSynthesis.Compatibility
                 __state = false;
                 lock (SaveGate)
                 {
-                    if (Plugin.Instance != null && Plugin.Instance.IsCompatibilityBlocked)
+                    // The independent critical prefix already rejects fatal/incomplete startup. Keep this
+                    // maintenance barrier fail-closed too; compatibility alone does not include init failure.
+                    if (Plugin.Instance == null || Plugin.Instance.IsPersistenceBlocked)
                     { __result = false; return false; }
                     if ((cleaning || quarantinedSession != null) && (__originalMethod.Name != nameof(GameSave.SaveCurrentGame) || __args.Length != 1 ||
                         permittedSaveName == null || !string.Equals(__args[0] as string, permittedSaveName, StringComparison.Ordinal)))
@@ -69,7 +71,7 @@ namespace DarkFogSynthesis.Compatibility
         {
             [HarmonyPrefix]
             private static bool BeforeResume() => !IsQuarantined &&
-                (Plugin.Instance == null || !Plugin.Instance.IsCompatibilityBlocked);
+                Plugin.Instance != null && !Plugin.Instance.IsPersistenceBlocked;
         }
 
         internal static void OnNewSession(GameData data)

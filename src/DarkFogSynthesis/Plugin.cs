@@ -27,16 +27,18 @@ namespace DarkFogSynthesis
         public const string Guid = "idkwhodatis.darkfogsynthesis";
         public const string Version = "0.1.0";
         internal static Plugin Instance { get; private set; } = null!;
-        private readonly ContentRegistry registry = new ContentRegistry();
+        // No runtime/content constructors run before the localization-independent critical barriers.
+        private ContentRegistry registry = null!;
         private readonly SessionCompatibilityState compatibility = new SessionCompatibilityState();
-        internal RuntimeProgression Progression { get; } = new RuntimeProgression();
-        internal bool Ready => registry.Ready && fatal == null && !compatibility.IsBlocked && !SafeRemovalService.IsQuarantined;
+        internal RuntimeProgression Progression { get; private set; } = null!;
+        internal bool Ready => registry?.Ready == true && StartupGuardEntrypoints.State.AllowsGameOperations && !compatibility.IsBlocked && !SafeRemovalService.IsQuarantined;
         internal bool IsCompatibilityBlocked => compatibility.IsBlocked;
+        internal bool IsPersistenceBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || compatibility.IsBlocked;
         private string? BlockingReason => fatal ?? compatibility.BlockReason;
         private Harmony harmony = null!;
-        private ConfigEntry<bool> nonPeaceSetting = null!;
+        private ConfigEntry<bool>? nonPeaceSetting;
         private bool nonPeaceAtStartup;
-        private string? fatal;
+        private string? fatal => StartupGuardEntrypoints.State.FailureReason;
         private string status = "Experimental build. Gameplay, saves, achievements and integrity are not yet validated. Use an isolated profile and copied saves only.";
         private bool showDiagnostics = true;
         private bool confirmRemoval;
@@ -47,31 +49,47 @@ namespace DarkFogSynthesis
         private void Awake()
         {
             Instance = this;
-            nonPeaceSetting = Config.Bind("Progression", "ApplyCombatPrerequisitesInNonPeaceMode", false,
-                "Also apply the four added combat prerequisites to non-Peace saves. Peace saves always use them. Restart required. / 是否在非和平存档中也启用四项额外战斗前置；和平存档始终启用。修改后重启游戏。");
-            nonPeaceAtStartup = nonPeaceSetting.Value;
             try
             {
-                Localization.Strings.Register();
-                LDBTool.PreAddDataAction += RegisterContent;
-                ProtoRegistry.onLoadingFinished += BindContent;
-                harmony = new Harmony(Guid);
-                harmony.PatchAll(typeof(Plugin).Assembly);
+                StartupGuardEntrypoints.State.Initialize(StartupGuardInstaller.InstallAndVerify, () =>
+                {
+                    registry = new ContentRegistry();
+                    Progression = new RuntimeProgression();
+                    nonPeaceSetting = Config.Bind("Progression", "ApplyCombatPrerequisitesInNonPeaceMode", false,
+                        "Also apply the four added combat prerequisites to non-Peace saves. Peace saves always use them. Restart required. / 是否在非和平存档中也启用四项额外战斗前置；和平存档始终启用。修改后重启游戏。");
+                    nonPeaceAtStartup = nonPeaceSetting.Value;
+                    Localization.Strings.Register();
+                    harmony = new Harmony(Guid);
+                    harmony.PatchAll(typeof(Plugin).Assembly);
+                    StartupGuardInstaller.Verify();
+                    // Subscribe only after all initialization/patching succeeds. Both callbacks recheck the
+                    // gate, so a partial subscription or a later failure cannot start prototype mutation.
+                    LDBTool.PreAddDataAction += RegisterContent;
+                    ProtoRegistry.onLoadingFinished += BindContent;
+                });
                 Logger.LogWarning(status);
             }
-            catch (Exception error) { Fail(error); }
+            catch (Exception error) { Fail(error); UnsubscribeContentCallbacks(); }
         }
 
         private void RegisterContent()
         {
-            try { registry.Register(); }
+            try
+            {
+                StartupGuardEntrypoints.State.EnsureInitializationComplete();
+                StartupGuardInstaller.Verify();
+                registry.Register();
+            }
             catch (Exception error) { Fail(error); throw; }
         }
 
         private void BindContent()
         {
             RegistrationLifecycle.BindAndDiagnose(() => {
+                StartupGuardEntrypoints.State.EnsureInitializationComplete();
+                StartupGuardInstaller.Verify();
                 registry.BindAndValidate();
+                StartupGuardEntrypoints.State.MarkContentReady();
                 status = "Registered 2 technologies and 6 recipes. This game layout, discovery behavior and save cleanup remain unverified; use copied diagnostic saves only.";
                 Logger.LogInfo(status);
             }, Fail,
@@ -93,7 +111,9 @@ namespace DarkFogSynthesis
         // Preparing a replacement must remain possible while the old session's block is latched.
         internal void EnsureRegistryReady()
         {
-            if (!registry.Ready || fatal != null) throw new InvalidOperationException("DarkFogSynthesis cannot safely enter this save: " + (fatal ?? "prototype initialization did not finish"));
+            StartupGuardEntrypoints.State.EnsureGameOperationsAllowed();
+            StartupGuardInstaller.Verify();
+            if (registry?.Ready != true) throw new InvalidOperationException("DarkFogSynthesis cannot safely enter this save: prototype initialization did not finish");
             registry.Validate();
             registry.ValidateExecutionCache();
             NativeRecipeCompatibility.ValidateSupportedMatrixRegistry();
@@ -108,6 +128,7 @@ namespace DarkFogSynthesis
         }
 
         internal void ValidateLoadedMachines(GameData data) => registry.ValidateSavedRecipeCaches(data);
+        internal void ValidateActiveProgression(GameData data) => Progression.ValidateLive(data.gameDesc.isPeaceMode, nonPeaceAtStartup);
         internal void ValidateImportedAssembler(AssemblerComponent machine) => registry.ValidateImportedAssembler(machine);
         internal void ValidateImportedLab(LabComponent machine) => registry.ValidateImportedLab(machine);
 
@@ -140,6 +161,7 @@ namespace DarkFogSynthesis
             try
             {
                 EnsureRegistryReady();
+                if (GameMain.data != null) ValidateActiveProgression(GameMain.data);
                 var required = FrozenContent.Technologies.SelectMany(t => t.ExplicitPrerequisites.Concat(t.ImplicitPrerequisites));
                 if (GameMain.data != null && ProgressionPolicy.ShouldApply(GameMain.data.gameDesc.isPeaceMode, nonPeaceAtStartup))
                     required = required.Concat(FrozenContent.CombatPrerequisites.Select(e => e.RequiredCombatTech));
@@ -165,10 +187,15 @@ namespace DarkFogSynthesis
 
         private void Fail(Exception error)
         {
-            fatal = error.Message;
+            StartupGuardEntrypoints.State.Fail(error);
             status = "BLOCKED: " + fatal;
+            confirmRemoval = false;
             showDiagnostics = true;
             Logger.LogError(error);
+            // Best effort only: missing critical Harmony hooks cannot be replaced by a status flag or pause.
+            // Do not auto-quit or claim shutdown/save safety; keep the incomplete-coverage warning visible.
+            try { if (GameMain.data != null && GameMain.isRunning) GameMain.Pause(); }
+            catch (Exception pauseError) { Logger.LogError(pauseError); }
         }
 
         private void OnGUI()
@@ -186,10 +213,10 @@ namespace DarkFogSynthesis
             // Export/preview messages must never hide the persistent reason that resuming is refused.
             if (BlockingReason != null) GUILayout.Label("BLOCKED: " + BlockingReason);
             if (BlockingReason == null || status != "BLOCKED: " + BlockingReason) GUILayout.Label(status);
-            if (nonPeaceSetting.Value != nonPeaceAtStartup) GUILayout.Label("Progression setting changed: restart the game for it to take effect.");
+            if (nonPeaceSetting != null && nonPeaceSetting.Value != nonPeaceAtStartup) GUILayout.Label("Progression setting changed: restart the game for it to take effect.");
             if (GUILayout.Button("Export runtime diagnostics / 导出运行时诊断"))
             {
-                try { status = "Diagnostics saved: " + CompatibilityReport.Export(registry.Ready, Ready, BlockingReason); Logger.LogInfo(status); }
+                try { status = "Diagnostics saved: " + CompatibilityReport.Export(registry?.Ready == true, Ready, BlockingReason); Logger.LogInfo(status); }
                 catch (Exception error) { status = "Diagnostic export failed: " + error.Message; Logger.LogError(error); }
             }
             if (Ready && GameMain.data != null && !GameMain.isLoading && !cleanupCandidate)
@@ -218,12 +245,22 @@ namespace DarkFogSynthesis
 
         private void OnDestroy()
         {
-            LDBTool.PreAddDataAction -= RegisterContent;
-            ProtoRegistry.onLoadingFinished -= BindContent;
-            try { Progression.Restore(); } catch (Exception error) { Logger.LogError(error); }
+            // Removing functional patches after startup failure or live disable must never reopen saves.
+            // The separate critical owner is deliberately process-lifetime and remains installed/closed.
+            Fail(new InvalidOperationException("DarkFogSynthesis was disabled or destroyed. Restart the game before loading, resuming or saving."));
+            UnsubscribeContentCallbacks();
+            try { Progression?.Restore(); } catch (Exception error) { Logger.LogError(error); }
             NativeRecipeCompatibility.Dispose();
             harmony?.UnpatchSelf();
             Localization.Strings.Dispose();
+        }
+
+        private void UnsubscribeContentCallbacks()
+        {
+            try { LDBTool.PreAddDataAction -= RegisterContent; }
+            catch (Exception error) { Logger.LogError(error); }
+            try { ProtoRegistry.onLoadingFinished -= BindContent; }
+            catch (Exception error) { Logger.LogError(error); }
         }
     }
 }

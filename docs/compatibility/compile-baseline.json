@@ -59,14 +59,14 @@
   "verification": {
     "pluginBuild": "passed: zero warnings/errors",
     "pureTests": {
-      "passed": 71,
-      "assertions": 15282
+      "passed": 73,
+      "assertions": 16307
     },
     "packagingGuardTests": {
-      "passed": 35
+      "passed": 48
     },
     "assetsAndLocalization": "passed",
-    "publicApiAccessibility": "passed: 820 direct game member sites, 195 unique members, 46 game types; no nonpublic/unresolved",
+    "publicApiAccessibility": "passed: 838 direct game member sites, 195 unique members, 46 game types; no nonpublic/unresolved",
     "gameAcceptanceCases": {
       "total": 35,
       "executed": 0
@@ -77,8 +77,9 @@
     },
     "compiledLocalizationResources": "passed: exact 30-key English/Chinese JSON in main DLL; no satellites",
     "frameworkRuntimeAssemblyResolution": "not_executed: verify installed Unity profile including System.Web.Extensions",
-    "buildIdentity": "845675040eb916017b1571f3dcca595ae50b7ddd6fb9bbd51bbb795c5f4094f1",
-    "compilerProvenance": "schema 2: exact plugin/Core hashes, actual Csc references (24 plugin / 113 Core), compiler inputs, SDK, configuration and reference mode; private paths excluded from distributed report"
+    "buildIdentity": "f4304f67e815b0360c47cee172678901258cf871147261f7f41d08425d621486",
+    "compilerProvenance": "schema 3: exact plugin/Core hashes, actual Csc references (24 plugin / 113 Core), compiler inputs, SDK, configuration, reference mode and five distribution asset/manifest hashes; private paths excluded from distributed report",
+    "criticalStartupReflectionTargets": "metadata-only check passed: 10 exact signatures, staticness, return types and original public visibility; native Harmony detours not executed"
   },
   "distribution": "All reference binaries stayed outside the source tree and are excluded from source/runtime packages. No game was launched or saves altered during these checks."
 }

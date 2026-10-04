@@ -25,6 +25,11 @@ namespace DarkFogSynthesis.Progression
             ApplyPlan(ProgressionPolicy.PlanSession(Snapshot(), owned, isPeaceMode, extendToCombat));
         }
 
+        // Called after application/final startup, never as a substitute for applying the mode policy.
+        // Synthesis availability/prerequisites are independently checked by ContentRegistry.Validate.
+        internal void ValidateLive(bool isPeaceMode, bool extendToCombat) =>
+            LiveProgressionValidator.ValidateHidden(isPeaceMode, extendToCombat);
+
         internal void Restore()
         {
             if (owned.Entries.Count == 0 && ownedPostCache.Count == 0) return;

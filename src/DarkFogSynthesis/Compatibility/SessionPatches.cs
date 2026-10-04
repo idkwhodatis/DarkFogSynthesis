@@ -105,6 +105,7 @@ namespace DarkFogSynthesis.Compatibility
                 GameMain.data.gameDesc == null || sessionPeaceMode.Value != GameMain.data.gameDesc.isPeaceMode)
                 throw new InvalidOperationException("Unsupported or changed session initialization order. The mode policy must be applied before history/queue initialization.");
             Plugin.Instance.EnsureSessionCanBegin(GameMain.data);
+            Plugin.Instance.ValidateActiveProgression(GameMain.data);
             Plugin.Instance.ValidateLoadedMachines(GameMain.data);
             SaveReconciler.Reconcile(GameMain.data.history);
             GameMain.data.history.VerifyTechQueue();

@@ -31,3 +31,11 @@ No target-game production, discovery, save migration, cleanup, achievement, Meta
 - Bound release acceptance to exact plugin/Core binaries and actual compiler references/configuration; rejected source/runtime symlink roots, ancestors and files
 - Retained live validation while removing execution-check iterator/array allocations, repeated immutable lookup construction and GUI callback churn; documented isolated benchmarks without a game-performance claim
 - Verification: 71 pure tests (15,282 assertions), clean reference compilation and both metadata audits; final package regression totals are in the source-verification record
+
+### Startup, live progression and package snapshot follow-up
+
+- Installed and verified ten localization-independent critical barriers before optional initialization; retained closed guards through fatal/partial failures and teardown
+- Added read-only final checks for required industrial/combat edges, live pre/post caches and synthesis technology availability, preserving valid foreign additions
+- Bound external runtime assets and manifest bytes to schema-v3 tested-build identity and validated frozen package inputs
+- Replaced check-then-overwrite ZIP creation with verified private staging and atomic no-overwrite publication
+- Verification: 73 pure tests (16,307 assertions), 48 packaging guards, 15 resource-audit self-tests, clean reference compilation and metadata checks; target-game acceptance remains unexecuted

@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 # Preserve lexical ancestors so a symlink used to reach the project cannot be
@@ -19,6 +20,14 @@ OWN_DLLS = ("DarkFogSynthesis.dll", "DarkFogSynthesis.Core.dll")
 CHECK_IDS = tuple(f"{prefix}{n:02}" for prefix, count in (("D", 4), ("R", 6), ("T", 6), ("S", 7), ("U", 5), ("I", 3), ("C", 3), ("V", 1)) for n in range(1, count + 1))
 TOP_FILES = ("README.md", "LICENSE", "manifest.json", "icon.png", "Directory.Build.props", "Directory.Build.targets", "Local.Build.props.example", "global.json", ".gitignore", "DarkFogSynthesis_Implementation_Plan_ZH.md")
 SOURCE_ROOTS = ("src", "tests", "scripts", "docs", "assets", ".github")
+# Logical project paths form part of the tested candidate, including metadata
+# used outside the compiled DLLs. The generated package icon is bound by the
+# source fingerprint and verified to be byte-identical to the root icon.
+DISTRIBUTION_FILES = ("manifest.json", "icon.png", "assets/generated/assets-manifest.json",
+                      "assets/generated/energy-analysis.png", "assets/generated/information-topology.png")
+ASSET_CHECK_FILES = ("scripts/generate-assets.py", "icon.png", "assets/generated/assets-manifest.json",
+                     *(f"assets/{folder}/{name}.{extension}" for folder, extension in (("source", "svg"), ("generated", "png"))
+                       for name in ("energy-analysis", "information-topology", "package-icon")))
 SOURCE_EXTENSIONS = {".cs", ".csproj", ".md", ".json", ".ps1", ".py", ".svg", ".png", ".yml", ".yaml", ".txt"}
 
 
@@ -88,8 +97,36 @@ def source_fingerprint() -> str:
     return source_fingerprint_from_bytes({name: path.read_bytes() for name, path in source_files().items() if is_build_source(name)})
 
 
-def validate_manifest() -> dict:
-    manifest = json.loads(project_path(ROOT / "manifest.json").read_text(encoding="utf-8"))
+def freeze_sources() -> dict[str, bytes]:
+    return {name: project_path(path).read_bytes() for name, path in source_files().items()}
+
+
+def distribution_hashes(snapshot: dict[str, bytes]) -> dict[str, str]:
+    return {name: hashlib.sha256(snapshot[name]).hexdigest() for name in DISTRIBUTION_FILES}
+
+
+def validate_asset_snapshot(snapshot: dict[str, bytes]) -> None:
+    """Run the existing image/pixel/hash validator only against frozen bytes.
+
+    This private staging tree has no links to mutable checkout inputs. Its
+    checker, SVGs, PNGs and asset manifest all come from the same snapshot used
+    for candidate recording or packaging; nothing is re-read from the checkout.
+    """
+    with tempfile.TemporaryDirectory(prefix="darkfog-assets-") as temporary:
+        stage = Path(temporary)
+        for name in ASSET_CHECK_FILES:
+            path = stage / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(snapshot[name])
+        try:
+            subprocess.run([sys.executable, str(stage / "scripts/generate-assets.py"), "--check"],
+                           check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as error:
+            raise ValueError(f"Frozen asset validation failed: {error.stderr.strip()}") from error
+
+
+def validate_manifest(content: bytes | None = None) -> dict:
+    manifest = json.loads(project_path(ROOT / "manifest.json").read_bytes() if content is None else content)
     if set(manifest) != {"name", "version_number", "website_url", "description", "dependencies"}:
         raise ValueError("Unexpected or missing Thunderstore manifest fields")
     if not re.fullmatch(r"[A-Za-z0-9_]{1,128}", manifest["name"]):
@@ -193,7 +230,7 @@ def compiler_provenance(configuration: str, reference_mode: str, paths: dict[str
     return {"references": references, "compilerInputs": captures}
 
 
-BUILD_BINDING_FIELDS = ("sourceFingerprint", "configuration", "referenceMode", "assemblies", "references", "compilerInputs")
+BUILD_BINDING_FIELDS = ("sourceFingerprint", "configuration", "referenceMode", "assemblies", "references", "compilerInputs", "distributionFiles")
 
 
 def build_identity(report: dict) -> str:
@@ -215,14 +252,18 @@ def record_build(configuration: str, reference_mode: str) -> None:
     paths = runtime_paths(configuration)
     resource_audit = validate_resource_audit(paths)
     public_api_audit = validate_public_api_audit(paths)
+    snapshot = freeze_sources()
+    validate_manifest(snapshot["manifest.json"])
+    validate_asset_snapshot(snapshot)
     report = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "runtimeBuildCompleted": True,
         "referenceMode": reference_mode,
         "runtimeExecution": "not_executed",
         "installedGameValidated": False,
         "configuration": configuration,
-        "sourceFingerprint": source_fingerprint(),
+        "sourceFingerprint": source_fingerprint_from_bytes(snapshot),
+        "distributionFiles": distribution_hashes(snapshot),
         "assemblies": {name: digest(path) for name, path in paths.items()},
         **compiler_provenance(configuration, reference_mode, paths),
         "resourceAudit": resource_audit,
@@ -272,8 +313,11 @@ def validate_build(configuration: str, *, with_report: bool = False):
     report_bytes = report_path.read_bytes()
     report = json.loads(report_bytes)
     validate_reference_mode(report)
-    if report.get("schemaVersion") != 2 or report.get("runtimeBuildCompleted") is not True or report.get("configuration") != configuration or report.get("sourceFingerprint") != source_fingerprint():
+    snapshot = freeze_sources()
+    if report.get("schemaVersion") != 3 or report.get("runtimeBuildCompleted") is not True or report.get("configuration") != configuration or report.get("sourceFingerprint") != source_fingerprint_from_bytes(snapshot):
         raise ValueError("Runtime build provenance is stale or incomplete. Rebuild the current inputs.")
+    if report.get("distributionFiles") != distribution_hashes(snapshot):
+        raise ValueError("Distribution assets or manifest do not match the tested candidate. Rebuild and repeat acceptance.")
     if report.get("assemblies") != {name: digest(path) for name, path in paths.items()}:
         raise ValueError("Runtime DLL hashes do not match the successful build report.")
     provenance = compiler_provenance(configuration, report["referenceMode"], paths)
@@ -292,14 +336,14 @@ def validate_release(acceptance_path: Path | None, configuration: str = "Release
         raise ValueError("Release requires an explicit --acceptance report. Experimental/source-only packages make no release claim.")
     acceptance_bytes = project_path(acceptance_path).read_bytes()
     report = json.loads(acceptance_bytes)
-    if report.get("schemaVersion") != 2 or report.get("releaseEligible") is not True or report.get("runtimeValidated") is not True or report.get("approvedForRelease") is not True:
+    if report.get("schemaVersion") != 3 or report.get("releaseEligible") is not True or report.get("runtimeValidated") is not True or report.get("approvedForRelease") is not True:
         raise ValueError("Release blocked: acceptance has not explicitly passed and been approved.")
     if report.get("sourceFingerprint") != source_fingerprint():
         raise ValueError("Release blocked: acceptance is not bound to the current build inputs.")
     paths, candidate, candidate_bytes = validate_build(configuration, with_report=True)
     validate_reference_mode(candidate, "release")
     if report.get("testedBuild") != tested_build(candidate):
-        raise ValueError("Release blocked: acceptance does not identify the exact tested candidate build, DLLs and resolved references.")
+        raise ValueError("Release blocked: acceptance does not identify the exact tested candidate build, DLLs, resolved references and distribution files.")
     environment = report.get("environment", {})
     if not environment.get("dspVersion") or not environment.get("unityVersion") or not environment.get("runtimeFramework"):
         raise ValueError("Release requires the actual DSP, Unity and framework versions.")
@@ -336,31 +380,70 @@ def validate_release(acceptance_path: Path | None, configuration: str = "Release
     return paths, candidate, candidate_bytes, report, acceptance_bytes
 
 
+def publish_archive(contents: dict[str, bytes], notice: dict, target: Path) -> str:
+    """Verify a private ZIP, then publish with atomic create-if-absent semantics.
+
+    No partial archive is exposed at the destination. link() never replaces a
+    collision winner (including symlinks/directories), unlike rename/replace.
+    Failure cleanup touches only our private staging tree, never target: checking
+    target's identity and then unlinking it would introduce another pathname race.
+    """
+    with tempfile.TemporaryDirectory(prefix=".darkfog-package-", dir=target.parent) as temporary:
+        staged = Path(temporary) / "archive.zip"
+        with staged.open("x+b") as stream:
+            with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+                for name, content in (*contents.items(), ("PACKAGE-STATUS.json", (json.dumps(notice, indent=2) + "\n").encode("utf-8"))):
+                    info = zipfile.ZipInfo(name, date_time=(2026, 10, 4, 0, 0, 0))
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    info.external_attr = 0o100644 << 16
+                    archive.writestr(info, content)
+            stream.seek(0)
+            with zipfile.ZipFile(stream) as archive:
+                if archive.testzip() is not None:
+                    raise ValueError("Archive integrity check failed")
+            stream.seek(0)
+            checksum = hashlib.sha256(stream.read()).hexdigest()
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(staged, target)
+        except FileExistsError as error:
+            raise ValueError(f"Output already exists; select a new output directory instead of silently replacing it: {target}") from error
+    return checksum
+
+
 def package(channel: str, configuration: str, acceptance: Path | None, output_dir: Path) -> Path:
-    # Validate source roots before the asset checker can read anything beneath them.
+    # Enumerate and reject linked roots before any source/asset checker reads them.
     sources = source_files()
-    manifest = validate_manifest()
-    subprocess.run([sys.executable, str(project_path(ROOT / "scripts/generate-assets.py")), "--check"], check=True)
-    files: dict[str, Path] = {}
     reference_mode = None
     candidate = None
     candidate_bytes = None
     accepted_report = None
     acceptance_bytes = None
-    if channel == "source-only":
-        prefix = f"DarkFogSynthesis-{manifest['version_number']}-source/"
-        files = {prefix + name: path for name, path in sources.items()}
-    else:
+    if channel != "source-only":
         if channel == "release":
             dlls, candidate, candidate_bytes, accepted_report, acceptance_bytes = validate_release(acceptance, configuration)
         else:
             dlls, candidate, candidate_bytes = validate_build(configuration, with_report=True)
-        build_report_path = ROOT / "artifacts/build-report.json"
         reference_mode = validate_reference_mode(candidate, channel)
+
+    # Freeze before validation. Reuse these bytes when constructing the archive,
+    # so neither the manifest nor runtime PNGs can change between check and use.
+    snapshot = {name: project_path(path).read_bytes() for name, path in sources.items()}
+    if candidate and (candidate["sourceFingerprint"] != source_fingerprint_from_bytes(snapshot)
+                      or candidate["distributionFiles"] != distribution_hashes(snapshot)):
+        raise ValueError("Candidate sources, distribution assets or manifest changed while packaging; rebuild and repeat acceptance.")
+    manifest = validate_manifest(snapshot["manifest.json"])
+    validate_asset_snapshot(snapshot)
+    if channel == "source-only":
+        prefix = f"DarkFogSynthesis-{manifest['version_number']}-source/"
+        files = {prefix + name: path for name, path in sources.items()}
+    else:
         files = {name: ROOT / name for name in ("manifest.json", "README.md", "icon.png", "LICENSE")}
-        files["BUILD-STATUS.json"] = build_report_path
+        files["BUILD-STATUS.json"] = ROOT / "artifacts/build-report.json"
         files["RESOURCE-AUDIT.json"] = ROOT / "artifacts/resource-audit.json"
         files["PUBLIC-API-AUDIT.json"] = ROOT / "artifacts/public-api-audit.json"
+        files["ASSET-AUDIT.json"] = ROOT / "assets/generated/assets-manifest.json"
         if channel == "release":
             files["RELEASE-ACCEPTANCE.json"] = project_path(acceptance)
         for name, path in dlls.items():
@@ -371,16 +454,15 @@ def package(channel: str, configuration: str, acceptance: Path | None, output_di
             if name.startswith("docs/") or name.startswith("assets/source/") or name == "assets/README.md":
                 files[name] = path
         files["CHANGELOG.md"] = ROOT / "docs/CHANGELOG.md"
-    for name, path in files.items():
+    contents = {}
+    for name, path in sorted(files.items()):
         if path.suffix.lower() in {".dll", ".exe", ".so", ".dylib"} and (channel == "source-only" or path.name not in OWN_DLLS):
             raise ValueError(f"Refusing foreign binary: {name}")
         project_path(path)
-    # Freeze the exact bytes written to the ZIP and its inventory. In particular,
-    # a concurrent rebuild must not replace a validated DLL before packaging it.
-    contents = {name: project_path(path).read_bytes() for name, path in sorted(files.items())}
+        relative = path.relative_to(ROOT).as_posix()
+        contents[name] = snapshot[relative] if relative in snapshot else path.read_bytes()
     hashes = {name: hashlib.sha256(content).hexdigest() for name, content in contents.items()}
-    package_fingerprint = (candidate["sourceFingerprint"] if candidate else
-                           source_fingerprint_from_bytes({name[len(prefix):]: content for name, content in contents.items()}))
+    package_fingerprint = candidate["sourceFingerprint"] if candidate else source_fingerprint_from_bytes(snapshot)
     if candidate:
         for name, expected in candidate["assemblies"].items():
             if hashes[f"BepInEx/plugins/DarkFogSynthesis/{name}"] != expected:
@@ -393,33 +475,18 @@ def package(channel: str, configuration: str, acceptance: Path | None, output_di
             raise ValueError("Build/acceptance evidence changed while packaging; retry after the inputs are stable.")
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / f"DarkFogSynthesis-{manifest['version_number']}-{channel}.zip"
-    if target.exists():
-        raise ValueError(f"Output already exists; select a new output directory instead of silently replacing it: {target}")
-    # Stable ZIP metadata: repeated packaging of identical input creates identical bytes.
-    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        for name, content in contents.items():
-            info = zipfile.ZipInfo(name, date_time=(2026, 10, 4, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o100644 << 16
-            archive.writestr(info, content)
-        notice = {
-            "channel": channel,
-            "installable": channel != "source-only",
-            "releaseAcceptanceValidated": channel == "release",
-            "referenceMode": reference_mode,
-            "sourceFingerprint": package_fingerprint,
-            "buildIdentity": candidate["buildIdentity"] if candidate else None,
-            "warning": "SOURCE ONLY: not an installable mod." if channel == "source-only" else (("EXPERIMENTAL REFERENCE-ASSEMBLY SMOKE BUILD: no installed game has been validated; isolated test profile and copied saves only." if reference_mode == "reference-assembly-smoke" else "EXPERIMENTAL: game/save/integrity compatibility unverified; use a separate profile and copied saves.") if channel == "experimental" else "Validated only for the recorded acceptance environment."),
-            "files": hashes,
-        }
-        info = zipfile.ZipInfo("PACKAGE-STATUS.json", date_time=(2026, 10, 4, 0, 0, 0))
-        info.compress_type = zipfile.ZIP_DEFLATED
-        info.external_attr = 0o100644 << 16
-        archive.writestr(info, json.dumps(notice, indent=2) + "\n")
-    with zipfile.ZipFile(target) as archive:
-        if archive.testzip() is not None:
-            raise ValueError("Archive integrity check failed")
-    print(f"Created {channel} archive: {target}; sha256={digest(target)}; {len(files)} allowlisted files")
+    notice = {
+        "channel": channel,
+        "installable": channel != "source-only",
+        "releaseAcceptanceValidated": channel == "release",
+        "referenceMode": reference_mode,
+        "sourceFingerprint": package_fingerprint,
+        "buildIdentity": candidate["buildIdentity"] if candidate else None,
+        "warning": "SOURCE ONLY: not an installable mod." if channel == "source-only" else (("EXPERIMENTAL REFERENCE-ASSEMBLY SMOKE BUILD: no installed game has been validated; isolated test profile and copied saves only." if reference_mode == "reference-assembly-smoke" else "EXPERIMENTAL: game/save/integrity compatibility unverified; use a separate profile and copied saves.") if channel == "experimental" else "Validated only for the recorded acceptance environment."),
+        "files": hashes,
+    }
+    checksum = publish_archive(contents, notice, target)
+    print(f"Created {channel} archive: {target}; sha256={checksum}; {len(files)} allowlisted files")
     return target
 
 

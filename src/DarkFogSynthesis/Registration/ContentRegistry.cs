@@ -6,6 +6,7 @@ using CommonAPI.Systems;
 using DarkFogSynthesis.Core.Definitions;
 using DarkFogSynthesis.Core.Registration;
 using DarkFogSynthesis.Core.Compatibility;
+using DarkFogSynthesis.Progression;
 using HarmonyLib;
 using UnityEngine;
 using xiaoye97;
@@ -22,6 +23,7 @@ namespace DarkFogSynthesis.Registration
         private readonly Dictionary<int, RecipeProto> recipes = new Dictionary<int, RecipeProto>();
         private readonly Dictionary<int, TechProto> technologies = new Dictionary<int, TechProto>();
         private bool queued;
+        private IReadOnlyCollection<int> combinedPreCacheTechs = Array.Empty<int>();
         internal bool Ready { get; private set; }
         internal bool OwnsRecipe(int id) => recipes.TryGetValue(id, out var recipe) && ReferenceEquals(LDB.recipes.Select(id), recipe);
 
@@ -142,6 +144,7 @@ namespace DarkFogSynthesis.Registration
                     if (!children.Contains(tech)) parent.postTechArray = children.Concat(new[] { tech }).ToArray();
                 }
             }
+            combinedPreCacheTechs = LiveProgressionValidator.CaptureSynthesisPreCacheModes();
             Validate();
             Ready = true;
         }
@@ -179,8 +182,8 @@ namespace DarkFogSynthesis.Registration
                 var tech = LDB.techs.Select(definition.Id.Value);
                 Require(ReferenceEquals(tech, technologies[definition.Id.Value]) && LDB.techs.dataArray.Count(t => t.ID == tech.ID) == 1,
                     "Technology ID collision: " + definition.Id);
-                Require(tech.PreTechs.SequenceEqual(definition.ExplicitPrerequisites.Select(t => t.Value)) &&
-                    tech.PreTechsImplicit.SequenceEqual(definition.ImplicitPrerequisites.Select(t => t.Value)), "New technology prerequisites changed.");
+                Require(tech.Published && !tech.IsObsolete,
+                    "Synthesis technology is unpublished or obsolete: " + definition.Id);
                 Require(tech.HashNeeded == definition.HashNeeded && tech.ItemPoints.SequenceEqual(definition.CandidateItemPoints) &&
                     tech.Items.SequenceEqual(definition.ResearchCost.Select(i => i.Item.Value)), "New technology research costs changed.");
                 Require(tech.PreItem.Length == 0 && !tech.IsHiddenTech && tech.AddItems.Length == 0 && tech.UnlockFunctions.Length == 0,
@@ -190,6 +193,7 @@ namespace DarkFogSynthesis.Registration
                 Require(TechLayoutResolver.FindMainTreeAnchorCollisions(definition.Id, new TechPosition(tech.Position.x, tech.Position.y), finalAnchors).Count == 0,
                     "A later registration occupied this mod's main-page technology anchor: " + definition.Id + ". Exact-anchor checks do not certify expanded layout bounds.");
             }
+            LiveProgressionValidator.ValidateSynthesis(combinedPreCacheTechs);
         }
 
         internal void ValidateExecutionCache()

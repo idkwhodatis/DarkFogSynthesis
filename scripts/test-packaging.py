@@ -4,6 +4,7 @@ import contextlib
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,6 +13,19 @@ import uuid
 import zipfile
 
 import package
+
+
+# Use committed original art and metadata as ordinary validation fixtures.
+# No game binaries, game data or DLL-shaped substitute is created or loaded.
+DISTRIBUTION_FIXTURE = {name: (package.ROOT / name).read_bytes()
+                        for name in (*package.ASSET_CHECK_FILES, "manifest.json", "README.md", "LICENSE", "docs/CHANGELOG.md")}
+
+
+def seed_distribution(root):
+    for name, content in DISTRIBUTION_FIXTURE.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
 
 
 @contextlib.contextmanager
@@ -23,6 +37,7 @@ def candidate_fixture():
     """
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
+        seed_distribution(root)
         paths = {}
         for name in package.OWN_DLLS:
             paths[name] = root / (name + ".fixture.txt")
@@ -69,9 +84,9 @@ def candidate_fixture():
         with patch.object(package, "ROOT", root), patch.object(package, "runtime_paths", return_value=paths), contextlib.redirect_stdout(io.StringIO()):
             build = rebuild()
             evidence = root / "docs/compatibility/evidence/guard-fixture.txt"
-            evidence.parent.mkdir(parents=True)
+            evidence.parent.mkdir(parents=True, exist_ok=True)
             evidence.write_text("Pure packaging test fixture. This is not game evidence.")
-            acceptance = {"schemaVersion": 2, "releaseEligible": True, "runtimeValidated": True, "approvedForRelease": True,
+            acceptance = {"schemaVersion": 3, "releaseEligible": True, "runtimeValidated": True, "approvedForRelease": True,
                           "sourceFingerprint": build["sourceFingerprint"], "testedBuild": package.tested_build(build),
                           "environment": {"dspVersion": "test-fixture", "unityVersion": "test-fixture", "runtimeFramework": "test-fixture",
                                           "dependencies": {name: {"packageVersion": "test-fixture", "assemblyVersion": "1.0.0.0",
@@ -189,7 +204,7 @@ class PackagingGuards(unittest.TestCase):
 
     def test_acceptance_cannot_relabel_binaries_references_configuration_or_identity(self):
         with candidate_fixture() as (_, _, _, _, acceptance, acceptance_path, _):
-            for field in ("buildIdentity", "configuration", "referenceMode", "assemblies", "references", "compilerInputs"):
+            for field in ("buildIdentity", "configuration", "referenceMode", "assemblies", "references", "compilerInputs", "distributionFiles"):
                 with self.subTest(field=field):
                     changed = copy.deepcopy(acceptance)
                     changed["testedBuild"][field] = "stale"
@@ -220,13 +235,6 @@ class PackagingGuards(unittest.TestCase):
     def test_release_packaging_refuses_build_or_acceptance_change_after_validation(self):
         for mutation in ("build", "acceptance"):
             with self.subTest(mutation=mutation), candidate_fixture() as (root, paths, _, _, acceptance, acceptance_path, rebuild):
-                for name in ("README.md", "LICENSE", "icon.png", "manifest.json", "scripts/generate-assets.py",
-                             "assets/generated/energy-analysis.png", "assets/generated/information-topology.png", "docs/CHANGELOG.md"):
-                    path = root / name
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text("ordinary temporary package fixture")
-                # Adding fixture assets changed the source fingerprint. Freeze a
-                # new baseline before arranging the validation/write interleave.
                 baseline = rebuild()
                 acceptance["sourceFingerprint"] = baseline["sourceFingerprint"]
                 acceptance["testedBuild"] = package.tested_build(baseline)
@@ -323,29 +331,14 @@ class PackagingGuards(unittest.TestCase):
 
     def test_runtime_package_assets_audits_and_metadata_cannot_use_symlinks(self):
         for relative in ("README.md", "artifacts/resource-audit.json", "assets/generated", "assets/generated/energy-analysis.png"):
-            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
-                root = Path(tmp) / "project"
-                root.mkdir()
-                for name in ("manifest.json", "README.md", "icon.png", "LICENSE", "scripts/generate-assets.py", "artifacts/build-report.json",
-                             "artifacts/resource-audit.json", "artifacts/public-api-audit.json", "assets/generated/energy-analysis.png",
-                             "assets/generated/information-topology.png", "docs/CHANGELOG.md"):
-                    path = root / name
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text("ordinary input fixture")
-                (root / "artifacts/build-report.json").write_text(json.dumps({"referenceMode": "installed-local", "buildIdentity": "a" * 64}))
+            with self.subTest(relative=relative), candidate_fixture() as (root, _, _, _, _, _, _), tempfile.TemporaryDirectory() as tmp:
                 outside = Path(tmp) / "harmless-target"
                 link = root / relative
-                if link.is_dir():
-                    link.rename(outside)
-                    link.symlink_to(outside, target_is_directory=True)
-                else:
-                    link.rename(outside)
-                    link.symlink_to(outside)
-                with patch.object(package, "ROOT", root), patch.object(package, "source_files", return_value={}), \
-                     patch.object(package, "validate_manifest", return_value={"version_number": "0.1.0"}), \
-                     patch.object(package, "validate_build", return_value=({}, {"referenceMode": "installed-local", "buildIdentity": "a" * 64}, b"")), patch.object(package.subprocess, "run"), \
-                     self.assertRaisesRegex(ValueError, "Symlink"):
-                    package.package("experimental", "Release", None, Path(tmp) / "out")
+                is_directory = link.is_dir()
+                link.rename(outside)
+                link.symlink_to(outside, target_is_directory=is_directory)
+                with self.assertRaisesRegex(ValueError, "Symlink"):
+                    package.package("experimental", "Release", None, root / "out")
 
     def test_reference_smoke_classification_is_preserved_for_experimental(self):
         self.assertEqual(package.validate_reference_mode({"referenceMode": "reference-assembly-smoke"}, "experimental"), "reference-assembly-smoke")
@@ -463,11 +456,12 @@ class PackagingGuards(unittest.TestCase):
     def test_source_package_fingerprint_uses_frozen_bytes_despite_later_source_edit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "project"
+            seed_distribution(root)
             code = root / "src/Code.cs"
             code.parent.mkdir(parents=True)
             code.write_text("// source snapshot A")
             script = root / "scripts/generate-assets.py"
-            script.parent.mkdir(); script.write_text("# harmless fixture, never executed")
+            script.write_text("# harmless fixture, never executed")
             original_zip = zipfile.ZipFile
 
             def edit_before_zip(*args, **kwargs):
@@ -488,11 +482,6 @@ class PackagingGuards(unittest.TestCase):
 
     def test_runtime_package_fingerprint_uses_validated_candidate_despite_later_source_edit(self):
         with candidate_fixture() as (root, _, _, _, _, _, rebuild):
-            for name in ("README.md", "LICENSE", "icon.png", "manifest.json", "scripts/generate-assets.py",
-                         "assets/generated/energy-analysis.png", "assets/generated/information-topology.png", "docs/CHANGELOG.md"):
-                path = root / name
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text("ordinary temporary package fixture")
             baseline = rebuild()
             original_zip = zipfile.ZipFile
 
@@ -509,6 +498,192 @@ class PackagingGuards(unittest.TestCase):
             self.assertEqual(status["sourceFingerprint"], baseline["sourceFingerprint"])
             self.assertEqual(status["sourceFingerprint"], build["sourceFingerprint"])
             self.assertNotEqual(status["sourceFingerprint"], package.source_fingerprint())
+
+    def test_distribution_files_are_required_in_candidate_identity(self):
+        with candidate_fixture() as (root, _, _, build, _, _, _):
+            self.assertEqual(build["schemaVersion"], 3)
+            self.assertEqual(set(build["distributionFiles"]), set(package.DISTRIBUTION_FILES))
+            for name in package.DISTRIBUTION_FILES:
+                changed = copy.deepcopy(build)
+                changed["distributionFiles"][name] = "0" * 64
+                self.assertNotEqual(package.build_identity(changed), build["buildIdentity"])
+            for value in (None, {}, {"manifest.json": build["distributionFiles"]["manifest.json"]}):
+                with self.subTest(value=value):
+                    changed = dict(build, distributionFiles=value)
+                    (root / "artifacts/build-report.json").write_text(json.dumps(changed))
+                    with self.assertRaisesRegex(ValueError, "Distribution assets or manifest"):
+                        package.validate_build("Release")
+
+    def test_legacy_schema_cannot_qualify_runtime_build_or_acceptance(self):
+        with candidate_fixture() as (root, _, _, build, acceptance, acceptance_path, _):
+            acceptance_path.write_text(json.dumps(dict(acceptance, schemaVersion=2)))
+            with self.assertRaisesRegex(ValueError, "Release blocked"):
+                package.validate_release(acceptance_path)
+            (root / "artifacts/build-report.json").write_text(json.dumps(dict(build, schemaVersion=2)))
+            with self.assertRaisesRegex(ValueError, "stale or incomplete"):
+                package.validate_build("Release")
+
+    def test_distribution_edits_invalidate_current_acceptance(self):
+        for name in package.DISTRIBUTION_FILES:
+            with self.subTest(name=name), candidate_fixture() as (root, _, _, _, _, acceptance_path, _):
+                path = root / name
+                path.write_bytes(path.read_bytes() + b"changed after acceptance")
+                with self.assertRaises(ValueError):
+                    package.validate_release(acceptance_path)
+
+    def test_valid_manifest_and_asset_manifest_edits_require_new_acceptance(self):
+        for name in ("manifest.json", "assets/generated/assets-manifest.json"):
+            with self.subTest(name=name), candidate_fixture() as (root, _, _, original, acceptance, acceptance_path, rebuild):
+                path = root / name
+                path.write_bytes(path.read_bytes() + b"\n")
+                candidate = rebuild()
+                self.assertNotEqual(original["distributionFiles"][name], candidate["distributionFiles"][name])
+                self.assertNotEqual(original["buildIdentity"], candidate["buildIdentity"])
+                package.validate_build("Release")
+                # Even relabeling the top-level source fingerprint cannot make
+                # prior target-game evidence approve the new external files.
+                acceptance["sourceFingerprint"] = candidate["sourceFingerprint"]
+                acceptance_path.write_text(json.dumps(acceptance))
+                with self.assertRaisesRegex(ValueError, "exact tested candidate"):
+                    package.validate_release(acceptance_path)
+
+    def test_record_build_refuses_invalid_frozen_png_and_keeps_previous_report(self):
+        with candidate_fixture() as (root, _, _, _, _, _, _):
+            before = (root / "artifacts/build-report.json").read_bytes()
+            (root / "assets/generated/energy-analysis.png").write_bytes(b"not a PNG")
+            with self.assertRaisesRegex(ValueError, "Frozen asset validation failed"):
+                package.record_build("Release", "installed-local")
+            self.assertEqual((root / "artifacts/build-report.json").read_bytes(), before)
+
+    def test_release_refuses_distribution_mutation_after_validation_before_snapshot(self):
+        for name in package.DISTRIBUTION_FILES:
+            with self.subTest(name=name), candidate_fixture() as (root, _, _, _, _, acceptance_path, _):
+                original_validate = package.validate_release
+
+                def mutate_after_validation(*args):
+                    result = original_validate(*args)
+                    (root / name).write_bytes(b"invalid replacement after candidate validation")
+                    return result
+
+                with patch.object(package, "validate_release", side_effect=mutate_after_validation), \
+                     self.assertRaisesRegex(ValueError, "changed while packaging"):
+                    package.package("release", "Release", acceptance_path, root / "out")
+                self.assertFalse((root / "out").exists())
+
+    def test_package_uses_validated_frozen_assets_despite_edits_before_contents_read(self):
+        for channel in ("source-only", "experimental", "release"):
+            with self.subTest(channel=channel), candidate_fixture() as (root, _, _, candidate, _, acceptance_path, _):
+                originals = {name: (root / name).read_bytes() for name in package.DISTRIBUTION_FILES}
+                original_validate = package.validate_asset_snapshot
+
+                def mutate_after_asset_validation(snapshot):
+                    original_validate(snapshot)
+                    for name in package.DISTRIBUTION_FILES:
+                        (root / name).write_bytes(b"invalid later mutable checkout content")
+
+                with patch.object(package, "validate_asset_snapshot", side_effect=mutate_after_asset_validation):
+                    target = package.package(channel, "Release", acceptance_path, root / "out")
+                with zipfile.ZipFile(target) as archive:
+                    status = json.loads(archive.read("PACKAGE-STATUS.json"))
+                    for name, expected in originals.items():
+                        if channel == "source-only":
+                            entry = "DarkFogSynthesis-0.1.0-source/" + name
+                        elif name == "assets/generated/assets-manifest.json":
+                            entry = "ASSET-AUDIT.json"
+                        elif name.startswith("assets/generated/"):
+                            entry = "BepInEx/plugins/DarkFogSynthesis/assets/" + Path(name).name
+                        else:
+                            entry = name
+                        self.assertEqual(archive.read(entry), expected)
+                        self.assertEqual(status["files"][entry], package.hashlib.sha256(expected).hexdigest())
+                    if channel != "source-only":
+                        self.assertEqual(status["buildIdentity"], candidate["buildIdentity"])
+
+    def test_source_package_rejects_invalid_frozen_manifest_and_png(self):
+        for name in ("manifest.json", "assets/generated/energy-analysis.png"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                seed_distribution(root)
+                (root / name).write_bytes(b"invalid file")
+                with patch.object(package, "ROOT", root), self.assertRaises(ValueError):
+                    package.package("source-only", "Release", None, root / "out")
+                self.assertFalse((root / "out").exists())
+
+    def test_atomic_publication_refuses_collision_created_at_publish_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "package.zip"
+            original_link = os.link
+
+            def collision_wins(source, destination):
+                Path(destination).write_bytes(b"other process won this destination")
+                return original_link(source, destination)
+
+            with patch.object(package.os, "link", side_effect=collision_wins), self.assertRaisesRegex(ValueError, "already exists"):
+                package.publish_archive({"ordinary.txt": b"fixture"}, {}, target)
+            self.assertEqual(target.read_bytes(), b"other process won this destination")
+            self.assertEqual(list(root.iterdir()), [target])
+
+    def test_atomic_publication_never_replaces_symlink_or_directory(self):
+        for kind in ("symlink", "directory", "dangling-symlink"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                target, unrelated = root / "package.zip", root / "unrelated.txt"
+                unrelated.write_bytes(b"preserve unrelated bytes")
+                if kind == "directory": target.mkdir()
+                else: target.symlink_to(unrelated if kind == "symlink" else root / "missing")
+                with self.assertRaisesRegex(ValueError, "already exists"):
+                    package.publish_archive({"ordinary.txt": b"fixture"}, {}, target)
+                self.assertEqual(unrelated.read_bytes(), b"preserve unrelated bytes")
+                self.assertTrue(target.is_dir() if kind == "directory" else target.is_symlink())
+                self.assertFalse(list(root.glob(".darkfog-package-*")))
+
+    def test_failed_archive_write_and_validation_leave_no_partial_destination(self):
+        for method in ("writestr", "testzip"):
+            with self.subTest(method=method), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                target = root / "package.zip"
+                unrelated = root / "unrelated.txt"
+                unrelated.write_bytes(b"preserve")
+                with patch.object(package.zipfile.ZipFile, method, side_effect=OSError("injected archive failure")), \
+                     self.assertRaisesRegex(OSError, "injected archive failure"):
+                    package.publish_archive({"ordinary.txt": b"fixture"}, {}, target)
+                self.assertFalse(target.exists())
+                self.assertEqual(list(root.iterdir()), [unrelated])
+                self.assertEqual(unrelated.read_bytes(), b"preserve")
+
+    def test_publication_failure_cleanup_never_unlinks_replaced_destination(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "package.zip"
+            original_link = os.link
+
+            def replace_destination_then_fail(source, destination):
+                original_link(source, destination)
+                replacement = root / "replacement.txt"
+                replacement.write_bytes(b"replacement owned by another process")
+                replacement.replace(destination)
+                raise OSError("injected post-publication failure")
+
+            with patch.object(package.os, "link", side_effect=replace_destination_then_fail), \
+                 self.assertRaisesRegex(OSError, "injected post-publication failure"):
+                package.publish_archive({"ordinary.txt": b"fixture"}, {}, target)
+            self.assertEqual(target.read_bytes(), b"replacement owned by another process")
+            self.assertEqual(list(root.iterdir()), [target])
+
+    def test_archive_is_verified_before_destination_becomes_visible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "package.zip"
+            original_test = zipfile.ZipFile.testzip
+
+            def verify_private_archive(archive):
+                self.assertFalse(target.exists())
+                return original_test(archive)
+
+            with patch.object(package.zipfile.ZipFile, "testzip", autospec=True, side_effect=verify_private_archive):
+                checksum = package.publish_archive({"ordinary.txt": b"fixture"}, {}, target)
+            self.assertEqual(checksum, package.digest(target))
+
 
 
 if __name__ == "__main__":
