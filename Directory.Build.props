@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Version>0.1.0</Version>
+    <Authors>DarkFogSynthesis contributors</Authors>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)Local.Build.props" Condition="Exists('$(MSBuildThisFileDirectory)Local.Build.props')" />
+</Project>

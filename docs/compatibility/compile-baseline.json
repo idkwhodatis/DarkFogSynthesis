@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "recordedDate": "2026-10-04",
+  "classification": "reference-assembly-smoke",
+  "runtimeExecution": "not_executed",
+  "installedGameValidated": false,
+  "releaseEligible": false,
+  "sdk": "8.0.425",
+  "pluginTarget": "net472",
+  "coreTarget": "netstandard2.0",
+  "pureTestsTarget": "net8.0",
+  "references": [
+    {
+      "name": "Assembly-CSharp.dll",
+      "sourcePackage": "DysonSphereProgram.GameLibs",
+      "packageVersion": "0.10.35.29088-r.0",
+      "feed": "https://nuget.bepinex.dev/v3/index.json",
+      "kind": "publicized stripped compile-only reference; no game method bodies",
+      "assemblyVersion": "0.0.0.0",
+      "sha256": "3c6d3211a948a528af1d4f813bffa5cc2d3bdddfacbc1a49dd7a29bb3b9deec9"
+    },
+    {
+      "name": "UnityEngine.CoreModule.dll",
+      "sourcePackage": "UnityEngine.Modules",
+      "packageVersion": "2022.3.53",
+      "kind": "compile-only reference",
+      "assemblyVersion": "0.0.0.0",
+      "sha256": "bb9b97f775c81ba49c1d45899cc8b54141661fd5e4b733dda6f4890de300415b"
+    },
+    {
+      "name": "BepInEx.dll",
+      "sourcePackage": "BepInEx.Core 5.4.21 / BepInEx.BaseLib 5.4.20",
+      "kind": "compile-only API reference; distinct from Thunderstore package declaration",
+      "assemblyVersion": "5.4.20.0",
+      "sha256": "dd06d2a45a3cd7ed11819621fb56405986456f1b5e33b13c300da9e47d450e3f"
+    },
+    {
+      "name": "0Harmony.dll",
+      "sourcePackage": "HarmonyX",
+      "packageVersion": "2.7.0",
+      "assemblyVersion": "2.7.0.0",
+      "sha256": "31992d0c7e368f449e6d293ed739d6ffa2fcde4d25447f66aa37e6e938f574c0"
+    },
+    {
+      "name": "CommonAPI.dll",
+      "sourcePackage": "CommonAPI-CommonAPI-1.6.7",
+      "source": "https://thunderstore.io/package/download/CommonAPI/CommonAPI/1.6.7/",
+      "assemblyVersion": "1.6.7.0",
+      "sha256": "a4fa247f22bcf4fab69d780e0ed5a019288c4b5391b03aa9f73a2beea91b96f1"
+    },
+    {
+      "name": "LDBTool.dll",
+      "sourcePackage": "xiaoye97-LDBTool-3.0.3",
+      "source": "https://thunderstore.io/package/download/xiaoye97/LDBTool/3.0.3/",
+      "assemblyVersion": "1.0.0.0",
+      "sha256": "8986d501178758b5cacbaec47c1bf3287ba2695d4846b352c321d16efb605692"
+    }
+  ],
+  "verification": {
+    "pluginBuild": "passed: zero warnings/errors",
+    "pureTests": {"passed": 50, "assertions": 7115},
+    "packagingGuardTests": {"passed": 12},
+    "assetsAndLocalization": "passed",
+    "publicApiAccessibility": "metadata-only audit against original visibility; passed",
+    "gameAcceptanceCases": {"total": 35, "executed": 0},
+    "fullP4InventoryRefunds": "not implemented; conservative drained-state candidate only"
+  },
+  "distribution": "All reference binaries stayed outside the source tree and are excluded from source/runtime packages. No game was launched or saves altered during these checks."
+}

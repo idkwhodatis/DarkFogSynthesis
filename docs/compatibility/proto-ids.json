@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "allocationVersion": 1,
+  "status": "fixed_project_ids_pending_target_runtime_validation",
+  "runtimeValidated": false,
+  "note": "Stable project IDs, not a globally reserved range. Startup must reject collisions; never renumber based on load order. Target runtime and recipe grid availability remain unverified.",
+  "techs": {
+    "energy_analysis": 1951,
+    "information_topology": 1952
+  },
+  "recipes": {
+    "energy_shard": 48101,
+    "dark_fog_matrix": 48102,
+    "silicon_neuron": 48103,
+    "matter_recombinator": 48104,
+    "negentropy_singularity": 48105,
+    "core_element": 48106
+  },
+  "itemsAdded": 0,
+  "buildingsAdded": 0
+}

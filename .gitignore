@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+artifacts/
+packages/
+Local.Build.props
+*.user
+*.suo
+*.dsv
+*.moddsv
+*.dll
+*.pdb
+*.binlog
+*.log
+**/__pycache__/
+*.pyc

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>DarkFogSynthesis</AssemblyName>
+    <RootNamespace>DarkFogSynthesis</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <ProjectReference Include="../DarkFogSynthesis.Core/DarkFogSynthesis.Core.csproj" />
+    <Reference Include="Assembly-CSharp" HintPath="$(DSPManagedDir)/Assembly-CSharp.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(DSPManagedDir)/UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(DSPManagedDir)/UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(DSPManagedDir)/UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(DSPManagedDir)/UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UIModule" HintPath="$(DSPManagedDir)/UnityEngine.UIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UI" HintPath="$(DSPManagedDir)/UnityEngine.UI.dll" Private="false" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="BepInEx" HintPath="$(BepInExDir)/BepInEx.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(BepInExDir)/0Harmony.dll" Private="false" />
+    <Reference Include="CommonAPI" HintPath="$(CommonApiDir)/CommonAPI.dll" Private="false" />
+    <Reference Include="LDBTool" HintPath="$(LdbToolDir)/LDBTool.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Localization/*.json" />
+    <None Include="../../assets/generated/*.png" Link="assets/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="RequireLocalReferences" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(DSPManagedDir)/Assembly-CSharp.dll')" Text="Set DSPManagedDir in Local.Build.props to your own lawful DSP installation. Runtime build was not performed; pure tests do not require game assemblies." />
+    <Error Condition="!Exists('$(BepInExDir)/BepInEx.dll') Or !Exists('$(CommonApiDir)/CommonAPI.dll') Or !Exists('$(LdbToolDir)/LDBTool.dll')" Text="Set BepInExDir, CommonApiDir, and LdbToolDir to the installed dependencies in your isolated profile. No dependencies are downloaded or bundled by this project." />
+  </Target>
+</Project>

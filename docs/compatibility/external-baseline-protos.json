@@ -1,0 +1,1940 @@
+{
+  "status": "External author-exported baseline; not the user installation and not runtime P0 acceptance",
+  "retrievedUtc": "2026-10-04",
+  "reportedGameVersion": "0.10.34.28529",
+  "sourceCommit": "142cc01517060be96be77e687d44512d756de851",
+  "sourceRepository": "https://github.com/soarqin/DSPSeedCalc",
+  "sourceBlobs": {
+    "ItemProtoSet.json": "b71f190b1a5d6a1029e859b8d4d3e3cd54cb74a9",
+    "TechProtoSet.json": "01d87269caa0f2e523db3c21cc210f40267684e8",
+    "RecipeProtoSet.json": "2f8af8a204801102feff6f25d2ed68858c6a67d1"
+  },
+  "items": [
+    {
+      "ID": 1109,
+      "Name": "高能石墨",
+      "Type": 2,
+      "GridIndex": 1204,
+      "IconPath": "Icons/ItemRecipe/graphite",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 1
+    },
+    {
+      "ID": 1110,
+      "Name": "玻璃",
+      "Type": 2,
+      "GridIndex": 1303,
+      "IconPath": "Icons/ItemRecipe/glass",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 1
+    },
+    {
+      "ID": 1119,
+      "Name": "钛化玻璃",
+      "Type": 2,
+      "GridIndex": 1509,
+      "IconPath": "Icons/ItemRecipe/titan-glass",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 4
+    },
+    {
+      "ID": 1113,
+      "Name": "晶格硅",
+      "Type": 2,
+      "GridIndex": 1305,
+      "IconPath": "Icons/ItemRecipe/silicium-high-purity",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 3
+    },
+    {
+      "ID": 1205,
+      "Name": "超级磁场环",
+      "Type": 3,
+      "GridIndex": 1604,
+      "IconPath": "Icons/ItemRecipe/hyper-magnetism-ring",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 4
+    },
+    {
+      "ID": 1127,
+      "Name": "奇异物质",
+      "Type": 2,
+      "GridIndex": 1408,
+      "IconPath": "Icons/ItemRecipe/strange-matter-generator",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 6
+    },
+    {
+      "ID": 1302,
+      "Name": "微晶元件",
+      "Type": 3,
+      "GridIndex": 1405,
+      "IconPath": "Icons/ItemRecipe/micro-component",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 2
+    },
+    {
+      "ID": 1304,
+      "Name": "位面过滤器",
+      "Type": 3,
+      "GridIndex": 1510,
+      "IconPath": "Icons/ItemRecipe/plane-filter",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 6
+    },
+    {
+      "ID": 1402,
+      "Name": "粒子宽带",
+      "Type": 3,
+      "GridIndex": 1411,
+      "IconPath": "Icons/ItemRecipe/particle-wide-band",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 5
+    },
+    {
+      "ID": 1401,
+      "Name": "电浆激发器",
+      "Type": 3,
+      "GridIndex": 1502,
+      "IconPath": "Icons/ItemRecipe/plasma-generator",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 2
+    },
+    {
+      "ID": 1404,
+      "Name": "光子合并器",
+      "Type": 3,
+      "GridIndex": 1503,
+      "IconPath": "Icons/ItemRecipe/photo-shifter",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 3
+    },
+    {
+      "ID": 1120,
+      "Name": "氢",
+      "Type": 2,
+      "GridIndex": 1109,
+      "IconPath": "Icons/ItemRecipe/hydrogen",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 3
+    },
+    {
+      "ID": 1122,
+      "Name": "反物质",
+      "Type": 2,
+      "GridIndex": 1111,
+      "IconPath": "Icons/ItemRecipe/anti-matter",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 7
+    },
+    {
+      "ID": 1802,
+      "Name": "氘核燃料棒",
+      "Type": 4,
+      "GridIndex": 1210,
+      "IconPath": "Icons/ItemRecipe/deuterium-energy-fuel",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 6
+    },
+    {
+      "ID": 1126,
+      "Name": "卡西米尔晶体",
+      "Type": 2,
+      "GridIndex": 1508,
+      "IconPath": "Icons/ItemRecipe/casimir-crystal",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 5
+    },
+    {
+      "ID": 1128,
+      "Name": "燃烧单元",
+      "Type": 3,
+      "GridIndex": 1307,
+      "IconPath": "Icons/ItemRecipe/explosive",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 2
+    },
+    {
+      "ID": 1125,
+      "Name": "框架材料",
+      "Type": 2,
+      "GridIndex": 1709,
+      "IconPath": "Icons/ItemRecipe/frame-material",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 5201,
+      "Name": "存储单元",
+      "Type": 10,
+      "GridIndex": 1807,
+      "IconPath": "Icons/ItemRecipe/memory",
+      "UnlockKey": -2,
+      "EnemyDropLevel": 4
+    },
+    {
+      "ID": 5202,
+      "Name": "硅基神经元",
+      "Type": 10,
+      "GridIndex": 1809,
+      "IconPath": "Icons/ItemRecipe/silicon-neuron",
+      "UnlockKey": -2,
+      "EnemyDropLevel": 6
+    },
+    {
+      "ID": 5203,
+      "Name": "物质重组器",
+      "Type": 10,
+      "GridIndex": 1811,
+      "IconPath": "Icons/ItemRecipe/reassembler",
+      "UnlockKey": -2,
+      "EnemyDropLevel": 5
+    },
+    {
+      "ID": 5204,
+      "Name": "负熵奇点",
+      "Type": 10,
+      "GridIndex": 1810,
+      "IconPath": "Icons/ItemRecipe/negentropy",
+      "UnlockKey": -2,
+      "EnemyDropLevel": 7
+    },
+    {
+      "ID": 5205,
+      "Name": "虚粒子",
+      "Type": 10,
+      "GridIndex": 1112,
+      "IconPath": "Icons/ItemRecipe/virtual-particle",
+      "UnlockKey": -2,
+      "EnemyDropLevel": 8
+    },
+    {
+      "ID": 5206,
+      "Name": "能量碎片",
+      "Type": 10,
+      "GridIndex": 1808,
+      "IconPath": "Icons/ItemRecipe/energy-fragment",
+      "UnlockKey": -2,
+      "EnemyDropLevel": 1
+    },
+    {
+      "ID": 2303,
+      "Name": "制造台 Mk.I",
+      "Type": 6,
+      "GridIndex": 2404,
+      "IconPath": "Icons/ItemRecipe/assembler-1",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2304,
+      "Name": "制造台 Mk.II",
+      "Type": 6,
+      "GridIndex": 2405,
+      "IconPath": "Icons/ItemRecipe/assembler-2",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2305,
+      "Name": "制造台 Mk.III",
+      "Type": 6,
+      "GridIndex": 2406,
+      "IconPath": "Icons/ItemRecipe/assembler-3",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2318,
+      "Name": "制造台 Mk.IV",
+      "Type": 6,
+      "GridIndex": 2407,
+      "IconPath": "Icons/ItemRecipe/assembler-4",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2316,
+      "Name": "大型采矿机",
+      "Type": 6,
+      "GridIndex": 2306,
+      "IconPath": "Icons/ItemRecipe/mining-drill-mk2",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2302,
+      "Name": "电弧熔炉",
+      "Type": 6,
+      "GridIndex": 2401,
+      "IconPath": "Icons/ItemRecipe/smelter",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2315,
+      "Name": "位面熔炉",
+      "Type": 6,
+      "GridIndex": 2402,
+      "IconPath": "Icons/ItemRecipe/smelter-2",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2309,
+      "Name": "化工厂",
+      "Type": 6,
+      "GridIndex": 2311,
+      "IconPath": "Icons/ItemRecipe/chemical-plant",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 2317,
+      "Name": "化工厂 Mk.II",
+      "Type": 6,
+      "GridIndex": 2312,
+      "IconPath": "Icons/ItemRecipe/chemical-plant-2",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 6001,
+      "Name": "电磁矩阵",
+      "Type": 11,
+      "GridIndex": 1801,
+      "IconPath": "Icons/ItemRecipe/t-matrix",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 6002,
+      "Name": "能量矩阵",
+      "Type": 11,
+      "GridIndex": 1802,
+      "IconPath": "Icons/ItemRecipe/e-matrix",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    },
+    {
+      "ID": 6003,
+      "Name": "结构矩阵",
+      "Type": 11,
+      "GridIndex": 1803,
+      "IconPath": "Icons/ItemRecipe/c-matrix",
+      "UnlockKey": 0,
+      "EnemyDropLevel": 0
+    }
+  ],
+  "techs": [
+    {
+      "ID": 1124,
+      "Name": "T结构矩阵",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1123
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        6001,
+        6002
+      ],
+      "ItemPoints": [
+        12,
+        12
+      ],
+      "HashNeeded": 240000,
+      "UnlockRecipes": [
+        27
+      ],
+      "Position": {
+        "x": 33.0,
+        "y": -23.0
+      }
+    },
+    {
+      "ID": 1145,
+      "Name": "T可控湮灭反应",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1506
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        6002,
+        6005
+      ],
+      "ItemPoints": [
+        24,
+        12
+      ],
+      "HashNeeded": 600000,
+      "UnlockRecipes": [
+        42,
+        44
+      ],
+      "Position": {
+        "x": 57.0,
+        "y": -3.0
+      }
+    },
+    {
+      "ID": 1203,
+      "Name": "T量子打印技术",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1202,
+        1303
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        6001,
+        6002,
+        6003,
+        6004
+      ],
+      "ItemPoints": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "HashNeeded": 288000,
+      "UnlockRecipes": [
+        47
+      ],
+      "Position": {
+        "x": 49.0,
+        "y": -3.0
+      }
+    },
+    {
+      "ID": 1312,
+      "Name": "T信息矩阵",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1302,
+        1133
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        6001,
+        6002
+      ],
+      "ItemPoints": [
+        10,
+        10
+      ],
+      "HashNeeded": 288000,
+      "UnlockRecipes": [
+        55
+      ],
+      "Position": {
+        "x": 41.0,
+        "y": -7.0
+      }
+    },
+    {
+      "ID": 1417,
+      "Name": "T位面冶金",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1141
+      ],
+      "PreTechsImplicit": [
+        1403
+      ],
+      "Items": [
+        6001,
+        6002,
+        6003,
+        6004
+      ],
+      "ItemPoints": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "HashNeeded": 360000,
+      "UnlockRecipes": [
+        116
+      ],
+      "Position": {
+        "x": 45.0,
+        "y": -23.0
+      }
+    },
+    {
+      "ID": 1801,
+      "Name": "T武器系统",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1001
+      ],
+      "PreTechsImplicit": [
+        1401
+      ],
+      "Items": [
+        6001
+      ],
+      "ItemPoints": [
+        10
+      ],
+      "HashNeeded": 7200,
+      "UnlockRecipes": [
+        125,
+        136
+      ],
+      "Position": {
+        "x": 13.0,
+        "y": -47.0
+      }
+    },
+    {
+      "ID": 1802,
+      "Name": "T燃烧单元",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1401
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        6001
+      ],
+      "ItemPoints": [
+        20
+      ],
+      "HashNeeded": 21600,
+      "UnlockRecipes": [
+        133
+      ],
+      "Position": {
+        "x": 17.0,
+        "y": 9.0
+      }
+    },
+    {
+      "ID": 1808,
+      "Name": "T信号塔",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1806
+      ],
+      "PreTechsImplicit": [
+        1101
+      ],
+      "Items": [
+        6001,
+        6002
+      ],
+      "ItemPoints": [
+        20,
+        20
+      ],
+      "HashNeeded": 72000,
+      "UnlockRecipes": [
+        131
+      ],
+      "Position": {
+        "x": 25.0,
+        "y": -43.0
+      }
+    },
+    {
+      "ID": 1809,
+      "Name": "T行星防御系统",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1807
+      ],
+      "PreTechsImplicit": [
+        1703
+      ],
+      "Items": [
+        6001,
+        6002
+      ],
+      "ItemPoints": [
+        12,
+        12
+      ],
+      "HashNeeded": 180000,
+      "UnlockRecipes": [
+        126,
+        132
+      ],
+      "Position": {
+        "x": 33.0,
+        "y": -47.0
+      }
+    },
+    {
+      "ID": 1811,
+      "Name": "T磁化电浆炮",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1809
+      ],
+      "PreTechsImplicit": [
+        1126
+      ],
+      "Items": [
+        6001,
+        6002,
+        6003,
+        6004
+      ],
+      "ItemPoints": [
+        12,
+        12,
+        12,
+        6
+      ],
+      "HashNeeded": 300000,
+      "UnlockRecipes": [
+        128,
+        142,
+        157
+      ],
+      "Position": {
+        "x": 41.0,
+        "y": -47.0
+      }
+    },
+    {
+      "ID": 1818,
+      "Name": "T反物质胶囊",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1145,
+        1811
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        6001,
+        6002,
+        6003,
+        6004,
+        6005
+      ],
+      "ItemPoints": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "HashNeeded": 540000,
+      "UnlockRecipes": [
+        143
+      ],
+      "Position": {
+        "x": 61.0,
+        "y": -47.0
+      }
+    },
+    {
+      "ID": 1820,
+      "Name": "T地面战斗机-A型",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1819
+      ],
+      "PreTechsImplicit": [
+        1502
+      ],
+      "Items": [
+        6001,
+        6002
+      ],
+      "ItemPoints": [
+        10,
+        10
+      ],
+      "HashNeeded": 144000,
+      "UnlockRecipes": [
+        148
+      ],
+      "Position": {
+        "x": 25.0,
+        "y": -59.0
+      }
+    },
+    {
+      "ID": 1826,
+      "Name": "T战场分析基站",
+      "IsHiddenTech": false,
+      "IsLabTech": true,
+      "PreItem": [],
+      "PreTechs": [
+        1801,
+        1805
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        6001
+      ],
+      "ItemPoints": [
+        10
+      ],
+      "HashNeeded": 36000,
+      "UnlockRecipes": [
+        152
+      ],
+      "Position": {
+        "x": 17.0,
+        "y": -59.0
+      }
+    },
+    {
+      "ID": 1901,
+      "Name": "T数字模拟计算",
+      "IsHiddenTech": true,
+      "IsLabTech": false,
+      "PreItem": [
+        5202
+      ],
+      "PreTechs": [
+        1312
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        5201
+      ],
+      "ItemPoints": [
+        120
+      ],
+      "HashNeeded": 24000,
+      "UnlockRecipes": [
+        153
+      ],
+      "Position": {
+        "x": 45.0,
+        "y": -7.0
+      }
+    },
+    {
+      "ID": 1902,
+      "Name": "T物质重组技术",
+      "IsHiddenTech": true,
+      "IsLabTech": false,
+      "PreItem": [
+        5203
+      ],
+      "PreTechs": [
+        1203
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        5201
+      ],
+      "ItemPoints": [
+        120
+      ],
+      "HashNeeded": 18000,
+      "UnlockRecipes": [
+        154
+      ],
+      "Position": {
+        "x": 53.0,
+        "y": -3.0
+      }
+    },
+    {
+      "ID": 1903,
+      "Name": "T负熵递归",
+      "IsHiddenTech": true,
+      "IsLabTech": false,
+      "PreItem": [
+        5204
+      ],
+      "PreTechs": [
+        1417
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        5201
+      ],
+      "ItemPoints": [
+        120
+      ],
+      "HashNeeded": 36000,
+      "UnlockRecipes": [
+        155
+      ],
+      "Position": {
+        "x": 49.0,
+        "y": -23.0
+      }
+    },
+    {
+      "ID": 1904,
+      "Name": "T金色燃料棒",
+      "IsHiddenTech": true,
+      "IsLabTech": false,
+      "PreItem": [
+        5205
+      ],
+      "PreTechs": [
+        1145
+      ],
+      "PreTechsImplicit": [],
+      "Items": [
+        5201
+      ],
+      "ItemPoints": [
+        120
+      ],
+      "HashNeeded": 60000,
+      "UnlockRecipes": [
+        156
+      ],
+      "Position": {
+        "x": 61.0,
+        "y": -7.0
+      }
+    }
+  ],
+  "nativeLabExamples": [
+    {
+      "Name": "能量矩阵",
+      "ID": 18,
+      "SID": "1802",
+      "Type": 15,
+      "Handcraft": true,
+      "Explicit": false,
+      "TimeSpend": 360,
+      "Items": [
+        1109,
+        1120
+      ],
+      "ItemCounts": [
+        2,
+        2
+      ],
+      "Results": [
+        6002
+      ],
+      "ResultCounts": [
+        1
+      ],
+      "GridIndex": 1802,
+      "IconPath": "",
+      "IconTag": "",
+      "Description": "",
+      "NonProductive": false,
+      "iconTagString": "",
+      "iconNameTagString": ""
+    },
+    {
+      "Name": "结构矩阵",
+      "ID": 27,
+      "SID": "1803",
+      "Type": 15,
+      "Handcraft": true,
+      "Explicit": false,
+      "TimeSpend": 480,
+      "Items": [
+        1112,
+        1118
+      ],
+      "ItemCounts": [
+        1,
+        1
+      ],
+      "Results": [
+        6003
+      ],
+      "ResultCounts": [
+        1
+      ],
+      "GridIndex": 1803,
+      "IconPath": "",
+      "IconTag": "",
+      "Description": "",
+      "NonProductive": false,
+      "iconTagString": "",
+      "iconNameTagString": ""
+    },
+    {
+      "Name": "信息矩阵",
+      "ID": 55,
+      "SID": "1804",
+      "Type": 15,
+      "Handcraft": true,
+      "Explicit": false,
+      "TimeSpend": 600,
+      "Items": [
+        1303,
+        1402
+      ],
+      "ItemCounts": [
+        2,
+        1
+      ],
+      "Results": [
+        6004
+      ],
+      "ResultCounts": [
+        1
+      ],
+      "GridIndex": 1804,
+      "IconPath": "",
+      "IconTag": "",
+      "Description": "",
+      "NonProductive": false,
+      "iconTagString": "",
+      "iconNameTagString": ""
+    },
+    {
+      "Name": "宇宙矩阵",
+      "ID": 75,
+      "SID": "1806",
+      "Type": 15,
+      "Handcraft": false,
+      "Explicit": false,
+      "TimeSpend": 900,
+      "Items": [
+        6001,
+        6002,
+        6003,
+        6004,
+        6005,
+        1122
+      ],
+      "ItemCounts": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "Results": [
+        6006
+      ],
+      "ResultCounts": [
+        1
+      ],
+      "GridIndex": 1806,
+      "IconPath": "",
+      "IconTag": "",
+      "Description": "",
+      "NonProductive": false,
+      "iconTagString": "",
+      "iconNameTagString": ""
+    }
+  ],
+  "mainPageNodes": [
+    {
+      "ID": 1,
+      "Name": "T戴森球计划",
+      "Position": {
+        "x": 5.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1001,
+      "Name": "T电磁学",
+      "Position": {
+        "x": 9.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1002,
+      "Name": "T电磁矩阵",
+      "Position": {
+        "x": 13.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1101,
+      "Name": "T高效电浆控制",
+      "Position": {
+        "x": 13.0,
+        "y": -27.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1102,
+      "Name": "T等离子萃取精炼",
+      "Position": {
+        "x": 17.0,
+        "y": -27.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1103,
+      "Name": "TX射线裂解",
+      "Position": {
+        "x": 25.0,
+        "y": -27.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1104,
+      "Name": "T重整精炼",
+      "Position": {
+        "x": 29.0,
+        "y": -27.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1105,
+      "Name": "T电弧激光",
+      "Position": {
+        "x": 17.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1111,
+      "Name": "T能量矩阵",
+      "Position": {
+        "x": 21.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1112,
+      "Name": "T氢燃料棒",
+      "Position": {
+        "x": 25.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1113,
+      "Name": "T推进器",
+      "Position": {
+        "x": 29.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1114,
+      "Name": "T加力推进器",
+      "Position": {
+        "x": 33.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1120,
+      "Name": "T流体储存封装",
+      "Position": {
+        "x": 13.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1121,
+      "Name": "T基础化工",
+      "Position": {
+        "x": 21.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1122,
+      "Name": "T高分子化工",
+      "Position": {
+        "x": 25.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1123,
+      "Name": "T高强度晶体",
+      "Position": {
+        "x": 29.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1124,
+      "Name": "T结构矩阵",
+      "Position": {
+        "x": 33.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1125,
+      "Name": "T卡西米尔晶体",
+      "Position": {
+        "x": 37.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1126,
+      "Name": "T高强度玻璃",
+      "Position": {
+        "x": 37.0,
+        "y": -19.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1131,
+      "Name": "T应用型超导体",
+      "Position": {
+        "x": 25.0,
+        "y": -19.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1132,
+      "Name": "T高强度材料",
+      "Position": {
+        "x": 33.0,
+        "y": -19.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1133,
+      "Name": "T粒子可控技术",
+      "Position": {
+        "x": 37.0,
+        "y": -15.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1134,
+      "Name": "T重氢分馏",
+      "Position": {
+        "x": 21.0,
+        "y": -15.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1141,
+      "Name": "T波函数干扰",
+      "Position": {
+        "x": 41.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1142,
+      "Name": "T微型粒子对撞机",
+      "Position": {
+        "x": 37.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1143,
+      "Name": "T奇异物质",
+      "Position": {
+        "x": 41.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1144,
+      "Name": "T人造恒星",
+      "Position": {
+        "x": 61.0,
+        "y": -3.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1145,
+      "Name": "T可控湮灭反应",
+      "Position": {
+        "x": 57.0,
+        "y": -3.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1151,
+      "Name": "T增产剂 Mk.I",
+      "Position": {
+        "x": 21.0,
+        "y": -11.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1152,
+      "Name": "T增产剂 Mk.II",
+      "Position": {
+        "x": 29.0,
+        "y": -11.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1153,
+      "Name": "T增产剂 Mk.III",
+      "Position": {
+        "x": 37.0,
+        "y": -11.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1201,
+      "Name": "T基础制造工艺",
+      "Position": {
+        "x": 13.0,
+        "y": -3.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1202,
+      "Name": "T高速制造工艺",
+      "Position": {
+        "x": 29.0,
+        "y": -3.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1203,
+      "Name": "T量子打印技术",
+      "Position": {
+        "x": 49.0,
+        "y": -3.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1302,
+      "Name": "T处理器",
+      "Position": {
+        "x": 25.0,
+        "y": -7.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1303,
+      "Name": "T量子芯片",
+      "Position": {
+        "x": 45.0,
+        "y": -19.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1304,
+      "Name": "T大型采矿机",
+      "Position": {
+        "x": 49.0,
+        "y": -19.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1305,
+      "Name": "T高级化工",
+      "Position": {
+        "x": 49.0,
+        "y": -31.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1311,
+      "Name": "T半导体材料",
+      "Position": {
+        "x": 17.0,
+        "y": -7.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1312,
+      "Name": "T信息矩阵",
+      "Position": {
+        "x": 41.0,
+        "y": -7.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1401,
+      "Name": "T自动化冶金",
+      "Position": {
+        "x": 13.0,
+        "y": 5.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1402,
+      "Name": "T冶炼提纯",
+      "Position": {
+        "x": 17.0,
+        "y": 5.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1403,
+      "Name": "T晶体冶炼",
+      "Position": {
+        "x": 21.0,
+        "y": 5.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1411,
+      "Name": "T钢材冶炼",
+      "Position": {
+        "x": 17.0,
+        "y": 13.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1412,
+      "Name": "T火力发电",
+      "Position": {
+        "x": 17.0,
+        "y": -15.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1413,
+      "Name": "T钛矿冶炼",
+      "Position": {
+        "x": 25.0,
+        "y": 13.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1414,
+      "Name": "T高强度钛合金",
+      "Position": {
+        "x": 33.0,
+        "y": 13.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1415,
+      "Name": "T移山填海工程",
+      "Position": {
+        "x": 21.0,
+        "y": 9.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1416,
+      "Name": "T微型核聚变发电",
+      "Position": {
+        "x": 33.0,
+        "y": -15.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1417,
+      "Name": "T位面冶金",
+      "Position": {
+        "x": 45.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1501,
+      "Name": "T太阳能收集",
+      "Position": {
+        "x": 21.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1502,
+      "Name": "T光子变频",
+      "Position": {
+        "x": 25.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1503,
+      "Name": "T太阳帆轨道系统",
+      "Position": {
+        "x": 29.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1504,
+      "Name": "T射线接收站",
+      "Position": {
+        "x": 33.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1505,
+      "Name": "T行星电离层利用",
+      "Position": {
+        "x": 49.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1506,
+      "Name": "T狄拉克逆变机制",
+      "Position": {
+        "x": 53.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1507,
+      "Name": "T宇宙矩阵",
+      "Position": {
+        "x": 65.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1508,
+      "Name": "T任务完成",
+      "Position": {
+        "x": 69.0,
+        "y": 1.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1511,
+      "Name": "T能量储存",
+      "Position": {
+        "x": 25.0,
+        "y": 9.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1512,
+      "Name": "T星际电力运输",
+      "Position": {
+        "x": 37.0,
+        "y": 9.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1513,
+      "Name": "T地热开采",
+      "Position": {
+        "x": 29.0,
+        "y": 5.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1521,
+      "Name": "T高强度轻质结构",
+      "Position": {
+        "x": 33.0,
+        "y": 5.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1522,
+      "Name": "T垂直发射井",
+      "Position": {
+        "x": 45.0,
+        "y": 5.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1523,
+      "Name": "T戴森球应力系统",
+      "Position": {
+        "x": 49.0,
+        "y": 5.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1601,
+      "Name": "T基础物流系统",
+      "Position": {
+        "x": 13.0,
+        "y": 21.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1602,
+      "Name": "T改良物流系统",
+      "Position": {
+        "x": 21.0,
+        "y": 21.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1603,
+      "Name": "T高效物流系统",
+      "Position": {
+        "x": 25.0,
+        "y": 21.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1604,
+      "Name": "T行星物流系统",
+      "Position": {
+        "x": 29.0,
+        "y": 21.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1605,
+      "Name": "T星际物流系统",
+      "Position": {
+        "x": 37.0,
+        "y": 21.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1606,
+      "Name": "T气态行星开采",
+      "Position": {
+        "x": 41.0,
+        "y": 13.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1607,
+      "Name": "T集装物流系统",
+      "Position": {
+        "x": 33.0,
+        "y": 17.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1608,
+      "Name": "T配送物流系统",
+      "Position": {
+        "x": 25.0,
+        "y": 17.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1701,
+      "Name": "T电磁驱动",
+      "Position": {
+        "x": 13.0,
+        "y": -35.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1702,
+      "Name": "T磁悬浮技术",
+      "Position": {
+        "x": 21.0,
+        "y": -35.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1703,
+      "Name": "T粒子磁力阱",
+      "Position": {
+        "x": 29.0,
+        "y": -35.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1704,
+      "Name": "T引力波折射",
+      "Position": {
+        "x": 45.0,
+        "y": -35.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1705,
+      "Name": "T引力矩阵",
+      "Position": {
+        "x": 49.0,
+        "y": -35.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1711,
+      "Name": "T超级磁场发生器",
+      "Position": {
+        "x": 25.0,
+        "y": -39.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1712,
+      "Name": "T卫星配电系统",
+      "Position": {
+        "x": 37.0,
+        "y": -39.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1801,
+      "Name": "T武器系统",
+      "Position": {
+        "x": 13.0,
+        "y": -47.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1802,
+      "Name": "T燃烧单元",
+      "Position": {
+        "x": 17.0,
+        "y": 9.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1803,
+      "Name": "T爆破单元",
+      "Position": {
+        "x": 33.0,
+        "y": -27.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1804,
+      "Name": "T晶石爆破单元",
+      "Position": {
+        "x": 41.0,
+        "y": -27.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1805,
+      "Name": "T动力引擎",
+      "Position": {
+        "x": 13.0,
+        "y": -43.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1806,
+      "Name": "T导弹防御塔",
+      "Position": {
+        "x": 21.0,
+        "y": -47.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1807,
+      "Name": "T聚爆加农炮",
+      "Position": {
+        "x": 25.0,
+        "y": -47.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1808,
+      "Name": "T信号塔",
+      "Position": {
+        "x": 25.0,
+        "y": -43.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1809,
+      "Name": "T行星防御系统",
+      "Position": {
+        "x": 33.0,
+        "y": -47.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1810,
+      "Name": "T干扰塔",
+      "Position": {
+        "x": 25.0,
+        "y": -51.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1811,
+      "Name": "T磁化电浆炮",
+      "Position": {
+        "x": 41.0,
+        "y": -47.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1812,
+      "Name": "T钛化弹箱",
+      "Position": {
+        "x": 29.0,
+        "y": -55.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1813,
+      "Name": "T超合金弹箱",
+      "Position": {
+        "x": 33.0,
+        "y": -55.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1814,
+      "Name": "T高爆炮弹组",
+      "Position": {
+        "x": 33.0,
+        "y": -43.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1815,
+      "Name": "T超音速导弹组",
+      "Position": {
+        "x": 37.0,
+        "y": -43.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1816,
+      "Name": "T晶石炮弹组",
+      "Position": {
+        "x": 41.0,
+        "y": -43.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1817,
+      "Name": "T引力导弹组",
+      "Position": {
+        "x": 49.0,
+        "y": -43.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1818,
+      "Name": "T反物质胶囊",
+      "Position": {
+        "x": 61.0,
+        "y": -47.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1819,
+      "Name": "T地面战斗机-E型",
+      "Position": {
+        "x": 21.0,
+        "y": -59.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1820,
+      "Name": "T地面战斗机-A型",
+      "Position": {
+        "x": 25.0,
+        "y": -59.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1821,
+      "Name": "T地面战斗机-F型",
+      "Position": {
+        "x": 33.0,
+        "y": -63.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1822,
+      "Name": "T太空战斗机-A型",
+      "Position": {
+        "x": 41.0,
+        "y": -59.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1823,
+      "Name": "T太空战斗机-F型",
+      "Position": {
+        "x": 49.0,
+        "y": -63.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1824,
+      "Name": "T电磁胶囊II",
+      "Position": {
+        "x": 41.0,
+        "y": -51.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1826,
+      "Name": "T战场分析基站",
+      "Position": {
+        "x": 17.0,
+        "y": -59.0
+      },
+      "IsHiddenTech": false
+    },
+    {
+      "ID": 1901,
+      "Name": "T数字模拟计算",
+      "Position": {
+        "x": 45.0,
+        "y": -7.0
+      },
+      "IsHiddenTech": true
+    },
+    {
+      "ID": 1902,
+      "Name": "T物质重组技术",
+      "Position": {
+        "x": 53.0,
+        "y": -3.0
+      },
+      "IsHiddenTech": true
+    },
+    {
+      "ID": 1903,
+      "Name": "T负熵递归",
+      "Position": {
+        "x": 49.0,
+        "y": -23.0
+      },
+      "IsHiddenTech": true
+    },
+    {
+      "ID": 1904,
+      "Name": "T金色燃料棒",
+      "Position": {
+        "x": 61.0,
+        "y": -7.0
+      },
+      "IsHiddenTech": true
+    }
+  ],
+  "candidateCustomTechIDs": {
+    "rejectedOccupied": [
+      1801,
+      1802
+    ],
+    "absentInThisBaselineOnly": [
+      1911,
+      1912,
+      1951,
+      1952
+    ],
+    "globallyReserved": false
+  }
+}

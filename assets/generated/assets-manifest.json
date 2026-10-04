@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "renderer": "Inkscape 1.4 (e7c3feb100, 2024-10-09)",
+  "assets": [
+    {
+      "source": "assets/source/energy-analysis.svg",
+      "sourceSha256": "fc858920f7b1cab2720a7fdb1fe35331ac63cbfb9ad49f31bd98d347efc74275",
+      "png": "assets/generated/energy-analysis.png",
+      "pngSha256": "825069cd260e03222b4b3a2be484c8364bb7e84e32a18b2a04cbc6de555585dc",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA",
+      "transparentPixels": 55955,
+      "opaquePixels": 6866,
+      "antialiasedPixels": 2715
+    },
+    {
+      "source": "assets/source/information-topology.svg",
+      "sourceSha256": "2cd9c72fe35fbbc46f3268260f997bce80e5daa99f1831d46ec79081d5480791",
+      "png": "assets/generated/information-topology.png",
+      "pngSha256": "c21cf354043f08aff6a8ea8ee8256006dd4a3de46c0e578045e0c94f35275af5",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA",
+      "transparentPixels": 55802,
+      "opaquePixels": 7141,
+      "antialiasedPixels": 2593
+    },
+    {
+      "source": "assets/source/package-icon.svg",
+      "sourceSha256": "57b2a000e3ed9d25fafd48f48b10e1a0841599b62240767ab5695e047adf0bf0",
+      "png": "assets/generated/package-icon.png",
+      "pngSha256": "95c1cf54956b59e78c257d88235db12c85ff69c71778532191a28496f45b76be",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA",
+      "transparentPixels": 1117,
+      "opaquePixels": 64137,
+      "antialiasedPixels": 282
+    }
+  ]
+}

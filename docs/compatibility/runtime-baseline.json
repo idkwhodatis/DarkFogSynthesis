@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "status": "not_executed",
+  "reason": "No legally installed target game runtime is available in this implementation environment.",
+  "dspVersion": null,
+  "unityVersion": null,
+  "runtimeFramework": null,
+  "assemblies": [],
+  "dependencies": {
+    "BepInEx": {"packageVersion": null, "assemblyVersion": null, "sha256": null},
+    "LDBTool": {"packageVersion": null, "assemblyVersion": null, "sha256": null},
+    "CommonAPI": {"packageVersion": null, "assemblyVersion": null, "sha256": null},
+    "DSPModSave": {"packageVersion": null, "assemblyVersion": null, "sha256": null}
+  },
+  "testedModCombinations": [],
+  "supportedRuntimeCombinations": [],
+  "integrityBypassAllowed": false
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Dark Fog Synthesis</title>
+  <desc>Original package emblem combining a faceted energy shard and a geometric information lattice. No game assets.</desc>
+  <rect width="256" height="256" rx="38" fill="#091720"/>
+  <path fill="#122d3a" d="m128 14 99 57v114l-99 57-99-57V71Z"/>
+  <path fill="none" stroke="#43818c" stroke-width="3" d="m128 23 91 52v106l-91 52-91-52V75Z"/>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#eefcff" stroke="#eefcff" stroke-width="5" d="m106 51 38 61-40 96-47-67Z"/>
+    <path fill="none" stroke="#0b2835" stroke-width="5" d="m106 51-11 78-38 12m38-12 49-17m-49 17 9 79"/>
+    <path fill="#0e3440" stroke="#7ce2df" stroke-width="6" d="m168 83 45 26v56l-45 26-46-26v-56Z"/>
+    <path fill="none" stroke="#7ce2df" stroke-width="4" d="m122 109 46 27 45-27m-45 27v55m-23-95 46 27v55m-69-41 46 27 45-27m-68 41v-55l45-27"/>
+  </g>
+  <g fill="#e4ffff"><circle cx="168" cy="83" r="5"/><circle cx="213" cy="109" r="5"/><circle cx="213" cy="165" r="5"/><circle cx="168" cy="191" r="5"/><circle cx="122" cy="165" r="5"/><circle cx="122" cy="109" r="5"/><circle cx="168" cy="136" r="6"/></g>
+</svg>

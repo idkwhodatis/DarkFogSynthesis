@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <!-- Point to your own lawful installation and isolated mod profile. No auto-install/copy targets. -->
+    <DSPGameDir>C:\Program Files (x86)\Steam\steamapps\common\Dyson Sphere Program</DSPGameDir>
+    <DSPManagedDir>$(DSPGameDir)\DSPGAME_Data\Managed</DSPManagedDir>
+    <BepInExDir>C:\path\to\isolated-profile\BepInEx\core</BepInExDir>
+    <CommonApiDir>C:\path\to\isolated-profile\BepInEx\plugins\CommonAPI</CommonApiDir>
+    <LdbToolDir>C:\path\to\isolated-profile\BepInEx\plugins\LDBTool</LdbToolDir>
+  </PropertyGroup>
+</Project>

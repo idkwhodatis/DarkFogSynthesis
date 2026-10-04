@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "status": "not_executed",
+  "gameVersion": null,
+  "source": null,
+  "items": [],
+  "recipes": [],
+  "techs": [],
+  "note": "No live target-runtime export exists. This intentionally empty template must be replaced by observed ItemProto/RecipeProto/TechProto fields, IDs, positions, pre-items, hidden flags, explicit/implicit prerequisites, and caches. Public-source candidate IDs are not a target-runtime snapshot."
+}

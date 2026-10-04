@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "status": "not_executed",
+  "gameVersion": null,
+  "validatedLayouts": [],
+  "candidatePositions": {
+    "energy_analysis": {"x": 21, "y": -55},
+    "information_topology": {"x": 29, "y": -43}
+  },
+  "candidatePositionsAreValidated": false,
+  "requiredEvidence": ["complete main-page node snapshot including hidden nodes and dependencies", "Chinese and English screenshots", "normal, hovered and expanded node bounds", "prerequisite lines and zoom states"],
+  "note": "Only these two custom nodes may move. No target game layout was captured; candidates must not be represented as verified clear positions."
+}

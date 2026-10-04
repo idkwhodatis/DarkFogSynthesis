@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Dark Fog Information Topology</title>
+  <desc>Original white technical emblem: layered cubic information cells linked at their vertices. Transparent background.</desc>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="7" d="m128 31 82 47v98l-82 48-82-48V78Z"/>
+    <path stroke-width="6" d="m46 78 82 48 82-48m-82 48v98"/>
+    <path stroke-width="4" d="m87 55 82 48v97M46 127l82 48 82-48M87 200v-98l82-47"/>
+    <path stroke-width="4" d="m88 103 40-24 41 24-41 24Zm0 0v48l40 24 41-24v-48"/>
+  </g>
+  <g fill="#fff"><circle cx="128" cy="31" r="8"/><circle cx="46" cy="78" r="8"/><circle cx="210" cy="78" r="8"/><circle cx="46" cy="176" r="8"/><circle cx="210" cy="176" r="8"/><circle cx="128" cy="224" r="8"/><circle cx="128" cy="126" r="10"/></g>
+</svg>

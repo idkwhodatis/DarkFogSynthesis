@@ -1,0 +1,11 @@
+{
+  "name": "DarkFogSynthesis",
+  "version_number": "0.1.0",
+  "website_url": "https://github.com/idkwhodatis/DarkFogSynthesis",
+  "description": "EXPERIMENTAL: two technologies and six vanilla-material synthesis recipes. Runtime, save cleanup, achievements, Metadata and Milky Way compatibility are unverified.",
+  "dependencies": [
+    "xiaoye97-BepInEx-5.4.17",
+    "xiaoye97-LDBTool-3.0.3",
+    "CommonAPI-CommonAPI-1.6.7"
+  ]
+}

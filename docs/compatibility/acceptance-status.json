@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 1,
+  "releaseEligible": false,
+  "runtimeValidated": false,
+  "approvedForRelease": false,
+  "sourceFingerprint": null,
+  "reason": "Target game and installed dependencies are unavailable. Static/pure tests cannot establish game acceptance.",
+  "environment": {
+    "dspVersion": null,
+    "unityVersion": null,
+    "runtimeFramework": null,
+    "dependencies": {}
+  },
+  "checks": [
+    {
+      "id": "D01",
+      "scenario": "六个配方定义",
+      "requirement": "与冻结数量一致；核心素反物质为 2；物质重组器氢为 2；负熵奇点奇异物质为 1",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "D02",
+      "scenario": "新增内容计数",
+      "requirement": "2 Tech、6 Recipe、0 新 Item、0 新 Building",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "D03",
+      "scenario": "配置四种组合",
+      "requirement": "与第 3.3 节完全一致",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "D04",
+      "scenario": "配方时长与产量",
+      "requirement": "基础速度下符合 60/15/15/10/7.5/6 个每分钟",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "R01",
+      "scenario": "能量碎片三输入熔炉",
+      "requirement": "不漏原料、不丢缓存，三类输入均可自动供料",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "R02",
+      "scenario": "黑雾矩阵四输入研究站",
+      "requirement": "正确生产、输出，未变成普通科研槽位",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "R03",
+      "scenario": "研究站堆叠/切模式",
+      "requirement": "上下层传输、生产转科研再转回均正常",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "R04",
+      "scenario": "其余四配方制造台",
+      "requirement": "所有兼容级别保持原版速度/功耗",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "R05",
+      "scenario": "六种手搓",
+      "requirement": "均可制造；上游原版不可手搓限制不被全局解除",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "R06",
+      "scenario": "六配方 × 增产状态",
+      "requirement": "加速与额外产物互斥、点数与能耗遵守原版",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "T01",
+      "scenario": "两项新科技首次研究",
+      "requirement": "前置、Hash、总矩阵消耗和解锁内容正确",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "T02",
+      "scenario": "仅解锁高级材料配方",
+      "requirement": "不因 Mod 自动赠物或伪造发现而提前显示隐藏科技",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "T03",
+      "scenario": "得到材料、缺战斗前置",
+      "requirement": "发现行为与原版一致；启用额外前置时不能绕过研究条件",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "T04",
+      "scenario": "有战斗前置、无材料",
+      "requirement": "不单靠新前置提前发现隐藏科技",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "T05",
+      "scenario": "已完成原版隐藏科技",
+      "requirement": "装 Mod/切换配置不重新锁定",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "T06",
+      "scenario": "原版队列/自动补前置",
+      "requirement": "不绕过未完成的研究条件，不损坏正常排队",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "S01",
+      "scenario": "早期和平旧档",
+      "requirement": "正常载入；两项新科技按正常条件可研究",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "S02",
+      "scenario": "中后期旧档",
+      "requirement": "只补齐已有前置对应的新配方，不免费完成自定义科技",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "S03",
+      "scenario": "同档连续十次加载",
+      "requirement": "不重复奖励、追加前置或修改库存",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "S04",
+      "scenario": "和平→战斗→和平",
+      "requirement": "前置策略无跨档泄漏",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "S05",
+      "scenario": "新科技研究到一半重载",
+      "requirement": "进度保持，不重复扣费或免费完成",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "S06",
+      "scenario": "机器半批次/喷涂缓存重载",
+      "requirement": "输入、输出、进度和增产点数一致",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "S07",
+      "scenario": "多工厂与非当前星球",
+      "requirement": "配方补齐和清理覆盖全部相关工厂",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "U01",
+      "scenario": "直接删除插件",
+      "requirement": "记录真实支持边界；失败时有受支持的清理流程",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "U02",
+      "scenario": "清理另存→纯原版加载",
+      "requirement": "无 Mod ID 活动引用导致的报错，保留物品和原版科技",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "U03",
+      "scenario": "退料空间不足/清理失败",
+      "requirement": "不报告成功、不覆盖原档、不丢物品",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "U04",
+      "scenario": "含自定义配方的蓝图",
+      "requirement": "明确风险；不自动破坏用户外部文件",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "U05",
+      "scenario": "清理后重新安装",
+      "requirement": "原版状态不倒退，本 Mod 新内容可重新正常建立",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "I01",
+      "scenario": "A/B/C 完整性对照",
+      "requirement": "本 Mod 不新增异常标记、Metadata 消费或成就资格变化",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "I02",
+      "scenario": "安全卸载后的 D 组",
+      "requirement": "纯原版完整性和正常功能保持",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "I03",
+      "scenario": "银河联网验证",
+      "requirement": "授权测试并记录结果；无法验证不得标通过",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "C01",
+      "scenario": "UXAssist 等禁用战斗科技选项",
+      "requirement": "冲突可诊断，不偷偷打开、解锁或更改其他 Mod 配置",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "C02",
+      "scenario": "Proto ID/配方槽位冲突",
+      "requirement": "清楚报错，不覆盖其他内容、不运行时随机改 ID",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "C03",
+      "scenario": "未支持游戏版本",
+      "requirement": "可见提示和诊断，不在正式存档上默默试错",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    },
+    {
+      "id": "V01",
+      "scenario": "中英科技树 UI",
+      "requirement": "两节点不重叠、展开后不遮挡、前置可理解",
+      "status": "not_executed",
+      "execution": "none",
+      "evidence": [],
+      "note": "Requires target-game verification on isolated profiles and copied saves."
+    }
+  ]
+}

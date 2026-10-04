@@ -1,0 +1,285 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Web.Script.Serialization;
+using BepInEx;
+using DarkFogSynthesis.Core.Definitions;
+using DarkFogSynthesis.Core.Compatibility;
+using HarmonyLib;
+
+namespace DarkFogSynthesis.Compatibility
+{
+    /// <summary>
+    /// Conservative, explicit maintenance operation. Active buffers are a blocker until native refund/capacity
+    /// behavior is game-tested. A candidate is NEVER certified vanilla-compatible merely because it serialized.
+    /// </summary>
+    internal static class SafeRemovalService
+    {
+        private static readonly HashSet<int> Recipes = new HashSet<int>(FrozenContent.Recipes.Select(r => r.Id.Value));
+        private static readonly HashSet<int> Technologies = new HashSet<int>(FrozenContent.Technologies.Select(t => t.Id.Value));
+        private static int writesInProgress;
+        private static bool cleaning;
+        private static GameData? quarantinedSession;
+        internal static bool IsQuarantined => quarantinedSession != null && ReferenceEquals(GameMain.data, quarantinedSession);
+        private static readonly object SaveGate = new object();
+        [ThreadStatic] private static string? permittedSaveName;
+
+        [HarmonyPatch]
+        private static class SaveWriteGuard
+        {
+            [HarmonyTargetMethods]
+            private static IEnumerable<MethodBase> Targets() => new[] {
+                AccessTools.Method(typeof(GameSave), nameof(GameSave.SaveCurrentGame)),
+                AccessTools.Method(typeof(GameSave), nameof(GameSave.AutoSave)),
+                AccessTools.Method(typeof(GameSave), nameof(GameSave.AutoSaveAfterErrored)),
+                AccessTools.Method(typeof(GameSave), nameof(GameSave.SaveAsLastExit)) };
+
+            [HarmonyPrefix, HarmonyPriority(Priority.First)]
+            private static bool BeginSave(MethodBase __originalMethod, object[] __args, ref bool __result, out bool __state)
+            {
+                __state = false;
+                lock (SaveGate)
+                {
+                    if ((cleaning || quarantinedSession != null) && (__originalMethod.Name != nameof(GameSave.SaveCurrentGame) || __args.Length != 1 ||
+                        permittedSaveName == null || !string.Equals(__args[0] as string, permittedSaveName, StringComparison.Ordinal)))
+                    { __result = false; return false; }
+                    ++writesInProgress;
+                    __state = true;
+                    return true;
+                }
+            }
+
+            [HarmonyFinalizer]
+            private static Exception? EndSave(bool __state, Exception? __exception)
+            {
+                if (__state) lock (SaveGate) --writesInProgress;
+                return __exception;
+            }
+        }
+
+        [HarmonyPatch(typeof(GameMain), nameof(GameMain.Resume))]
+        private static class ResumeGuard
+        {
+            [HarmonyPrefix]
+            private static bool BeforeResume() => !IsQuarantined;
+        }
+
+        internal static void OnNewSession(GameData data)
+        {
+            if (quarantinedSession != null && !ReferenceEquals(quarantinedSession, data)) quarantinedSession = null;
+        }
+
+        internal static string Preview()
+        {
+            if (GameMain.data == null || GameMain.mainPlayer == null) return "No loaded game to inspect.";
+            var scan = Scan(GameMain.data, false);
+            return scan.Blockers.Count == 0
+                ? $"Candidate preflight: {scan.Assemblers.Count} assembler/smelter and {scan.Labs.Count} lab references. No active buffers found. Vanilla reload and external blueprint safety are still unverified."
+                : "Cleanup blocked: " + string.Join("; ", scan.Blockers.Take(12));
+        }
+
+        internal static string PrepareCandidate()
+        {
+            Plugin.Instance.EnsureReady();
+            lock (SaveGate)
+            {
+                if (cleaning || quarantinedSession != null || writesInProgress != 0 || GameMain.isLoading || GameMain.data == null || GameMain.mainPlayer == null)
+                    throw new InvalidOperationException("A game must be loaded, with no other save or maintenance operation in progress.");
+                cleaning = true;
+            }
+            bool pausedBefore = GameMain.isPaused;
+            bool succeeded = false;
+            var data = GameMain.data;
+            var history = data.history;
+            var rollback = new List<Action>();
+            string? backupName = null;
+            string? candidateName = null;
+            try
+            {
+                GameMain.Pause();
+                if (!GameMain.isPaused) throw new InvalidOperationException("The simulation could not be paused.");
+                var scan = Scan(data, false);
+                if (scan.Blockers.Count != 0) throw new InvalidOperationException(string.Join("; ", scan.Blockers));
+                string token = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + System.Guid.NewGuid().ToString("N").Substring(0, 8);
+                backupName = "DFS-backup-" + token;
+                candidateName = "DFS-removal-candidate-" + token;
+                if (GameSave.SaveExist(backupName) || GameSave.SaveExist(candidateName)) throw new IOException("Unique maintenance save name already exists.");
+                SaveNewAndVerify(backupName); // First durable copy: nothing has been removed yet.
+                // Recheck after all native save callbacks. No writes start if inventory or references changed.
+                var secondScan = Scan(data, false);
+                if (secondScan.Blockers.Count != 0 || !scan.SameTargets(secondScan))
+                    throw new InvalidOperationException("State changed while the backup was created. Backup is retained; no cleanup was performed.");
+
+                var originalRecipes = new HashSet<int>(history.recipeUnlocked);
+                var originalTechs = new Dictionary<int, TechState>(history.techStates);
+                var originalQueue = (int[])history.techQueue.Clone();
+                rollback.Add(() =>
+                {
+                    // Restore only our IDs. Never replace shared collections or undo another mod's unrelated writes.
+                    foreach (int recipe in Recipes)
+                        if (originalRecipes.Contains(recipe)) history.recipeUnlocked.Add(recipe); else history.recipeUnlocked.Remove(recipe);
+                    foreach (int tech in Technologies)
+                        if (originalTechs.TryGetValue(tech, out var state)) history.techStates[tech] = state; else history.techStates.Remove(tech);
+                });
+                quarantinedSession = data;
+
+                foreach (var target in scan.Assemblers)
+                {
+                    var factory = target.Item1; int index = target.Item2;
+                    var component = factory.factorySystem.assemblerPool[index];
+                    int entity = component.entityId;
+                    var sign = factory.entitySignPool[entity];
+                    byte[] bytes = Serialize(w => component.Export(w));
+                    rollback.Add(() =>
+                    {
+                        if (factory.factorySystem.assemblerPool[index].id != component.id || factory.factorySystem.assemblerPool[index].entityId != entity)
+                            throw new InvalidOperationException("An assembler was replaced during cleanup; refusing to overwrite a different entity.");
+                        using (var reader = new BinaryReader(new MemoryStream(bytes))) factory.factorySystem.assemblerPool[index].Import(reader);
+                        factory.entitySignPool[entity] = sign;
+                    });
+                    factory.factorySystem.assemblerPool[index].SetRecipe(0, factory.entitySignPool);
+                }
+                foreach (var target in scan.Labs)
+                {
+                    var factory = target.Item1; int index = target.Item2;
+                    var component = factory.factorySystem.labPool[index];
+                    int entity = component.entityId;
+                    var sign = factory.entitySignPool[entity];
+                    byte[] bytes = Serialize(w => component.Export(w));
+                    rollback.Add(() =>
+                    {
+                        if (factory.factorySystem.labPool[index].id != component.id || factory.factorySystem.labPool[index].entityId != entity)
+                            throw new InvalidOperationException("A lab was replaced during cleanup; refusing to overwrite a different entity.");
+                        using (var reader = new BinaryReader(new MemoryStream(bytes))) factory.factorySystem.labPool[index].Import(reader);
+                        factory.entitySignPool[entity] = sign;
+                    });
+                    factory.factorySystem.labPool[index].SetFunction(false, 0, 0, factory.entitySignPool);
+                }
+                // Queued/current custom research was rejected in preflight. Do not invoke queue APIs whose
+                // current-tech/mecha cache side effects cannot yet be safely rolled back on this target.
+                foreach (int recipe in Recipes) history.recipeUnlocked.Remove(recipe);
+                foreach (int tech in Technologies) history.techStates.Remove(tech);
+
+                var remaining = Scan(data, true);
+                if (remaining.Blockers.Count != 0 || remaining.Assemblers.Count != 0 || remaining.Labs.Count != 0)
+                    throw new InvalidOperationException("Reference sweep did not finish cleanly: " + string.Join("; ", remaining.Blockers));
+                if (!originalRecipes.Where(id => !Recipes.Contains(id)).ToHashSetCompat().SetEquals(history.recipeUnlocked))
+                    throw new InvalidOperationException("An unrelated recipe unlock changed; cleanup is being rolled back.");
+                if (originalTechs.Where(k => !Technologies.Contains(k.Key)).Any(k => !history.techStates.TryGetValue(k.Key, out var value) || !value.Equals(k.Value))
+                    || history.techStates.Count != originalTechs.Count(k => !Technologies.Contains(k.Key)))
+                    throw new InvalidOperationException("Unrelated research state changed; cleanup is being rolled back.");
+                var expectedQueue = originalQueue.Where(id => id != 0 && !Technologies.Contains(id)).ToArray();
+                if (!history.techQueue.Where(id => id != 0).SequenceEqual(expectedQueue))
+                    throw new InvalidOperationException("Unrelated research queue entries changed; cleanup is being rolled back.");
+                SaveNewAndVerify(candidateName);
+                var afterSave = Scan(data, true);
+                if (afterSave.Blockers.Count != 0 || afterSave.Assemblers.Count != 0 || afterSave.Labs.Count != 0)
+                    throw new InvalidOperationException("Native save callbacks reintroduced known custom references. The candidate is not accepted.");
+                string reportDir = Path.Combine(Paths.ConfigPath, "DarkFogSynthesis", "diagnostics");
+                Directory.CreateDirectory(reportDir);
+                File.WriteAllText(Path.Combine(reportDir, "removal-" + token + ".json"), new JavaScriptSerializer().Serialize(new
+                {
+                    status = "CANDIDATE_ONLY_VANILLA_RELOAD_NOT_TESTED", backupName, candidateName,
+                    assemblerReferencesCleared = scan.Assemblers.Count, labReferencesCleared = scan.Labs.Count,
+                    vanillaResearchPreserved = true, knownLiveReferencesRemaining = 0,
+                    inventoryHandling = "All affected buffers were empty; no item refunds, gifts or inventory edits were performed.",
+                    externalBlueprints = "Not read or changed; copied external blueprints containing custom recipe IDs must not be reused without cleanup."
+                }));
+                succeeded = true;
+                return "Created " + backupName + " and " + candidateName + ". This is an UNVERIFIED removal candidate, not a certified vanilla-compatible save. Quit the game now; test the candidate in a separate vanilla profile. Keep the backup. Simulation remains paused.";
+            }
+            catch (Exception original)
+            {
+                var errors = new List<Exception>();
+                for (int i = rollback.Count - 1; i >= 0; --i)
+                    try { rollback[i](); } catch (Exception error) { errors.Add(error); }
+                if (errors.Count != 0) throw new AggregateException("Cleanup failed and in-memory rollback was incomplete. Keep the game paused and reload backup " + backupName + ". Never overwrite the original.", new[] { original }.Concat(errors));
+                if (rollback.Count != 0)
+                    throw new InvalidOperationException("Cleanup failed; in-memory changes were restored and the game remains paused. Reload the backup before continuing. Backup: " + backupName + "; candidate (if created, do not treat as successful): " + candidateName + ". " + original.Message, original);
+                throw;
+            }
+            finally
+            {
+                lock (SaveGate) cleaning = false;
+                // Failed preflight does not leave a formerly running game paused. Successful candidates must be exited.
+                if (!succeeded && rollback.Count == 0 && !pausedBefore) GameMain.Resume();
+            }
+        }
+
+        private static ScanResult Scan(GameData data, bool requireRemoved)
+        {
+            var result = new ScanResult();
+            if (RemovalSafetyPolicy.HasCustomQueueReferences(data.history.currentTech, data.history.techQueue,
+                data.mainPlayer.mecha.forge.tasks.Select(t => t.recipeId).ToArray()))
+                result.Blockers.Add("Custom or unknown crafting/research queue state must be cleared with native controls before cleanup.");
+            if (Technologies.Contains(data.history.currentTech) || data.history.techQueue.Any(Technologies.Contains))
+                result.Blockers.Add("Cancel custom research in the native research queue before cleanup; active-research resource handling is not verified.");
+            if (data.mainPlayer.mecha.forge.tasks.Any(t => Recipes.Contains(t.recipeId)))
+                result.Blockers.Add("Finish/cancel custom handcraft tasks using the vanilla queue first; reserved-material refunds are not verified.");
+            if (Recipes.Contains(BuildingParameters.clipboard.recipeId) || Recipes.Contains(BuildingParameters.template.recipeId))
+                result.Blockers.Add("Clear the copied building recipe/template using vanilla controls.");
+            var build = data.mainPlayer.controller.actionBuild;
+            if (build.active) result.Blockers.Add("Exit build/blueprint mode before preparing a removal candidate.");
+            if (HasRecipe(build.blueprintClipboard) || HasRecipe(build.blueprintPasteTool?.blueprint) || HasRecipe(build.blueprintCopyTool?.blueprint))
+                result.Blockers.Add("Clear the active blueprint/clipboard. External blueprint files are not modified.");
+            for (int f = 0; f < data.factoryCount; ++f)
+            {
+                var factory = data.factories[f];
+                if (factory == null) continue;
+                for (int index = 1; index < factory.prebuildCursor; ++index)
+                    if (factory.prebuildPool[index].id == index && Recipes.Contains(factory.prebuildPool[index].recipeId))
+                        result.Blockers.Add("Pending build on planet " + factory.planetId + " references a custom recipe; complete/cancel it first.");
+                var system = factory.factorySystem;
+                for (int index = 1; index < system.assemblerCursor; ++index)
+                {
+                    var assembler = system.assemblerPool[index];
+                    if (assembler.id != index || !Recipes.Contains(assembler.recipeId)) continue;
+                    result.Assemblers.Add(Tuple.Create(factory, index));
+                    if (RemovalSafetyPolicy.HasProductionState(assembler.time, assembler.extraTime, assembler.cycleCount,
+                        assembler.extraCycleCount, assembler.replicating, assembler.served, assembler.incServed, assembler.produced))
+                        result.Blockers.Add("Drain/reset assembler " + index + " on planet " + factory.planetId + " with vanilla controls; it contains resources or production progress.");
+                }
+                for (int index = 1; index < system.labCursor; ++index)
+                {
+                    var lab = system.labPool[index];
+                    if (lab.id != index || (!Recipes.Contains(lab.recipeId) && !Technologies.Contains(lab.techId))) continue;
+                    result.Labs.Add(Tuple.Create(factory, index));
+                    if (RemovalSafetyPolicy.HasProductionState(lab.time, lab.extraTime, lab.cycleCount, lab.extraCycleCount,
+                        lab.replicating, lab.served, lab.incServed, lab.produced)
+                        || RemovalSafetyPolicy.HasResearchState(lab.hashBytes, lab.extraHashBytes, lab.matrixServed, lab.matrixIncServed))
+                        result.Blockers.Add("Drain/reset lab " + index + " on planet " + factory.planetId + " with vanilla controls; it contains resources or progress.");
+                }
+            }
+            if (requireRemoved && (data.history.recipeUnlocked.Any(Recipes.Contains) || data.history.techStates.Keys.Any(Technologies.Contains)
+                || data.history.techQueue.Any(Technologies.Contains) || Technologies.Contains(data.history.currentTech))) result.Blockers.Add("Custom history references remain.");
+            return result;
+        }
+
+        private static bool HasRecipe(BlueprintData? blueprint) => blueprint?.buildings != null && blueprint.buildings.Any(b => Recipes.Contains(b.recipeId));
+        private static byte[] Serialize(Action<BinaryWriter> export)
+        {
+            using (var stream = new MemoryStream()) { using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true)) export(writer); return stream.ToArray(); }
+        }
+        private static void SaveNewAndVerify(string name)
+        {
+            if (GameSave.SaveExist(name)) throw new IOException("Refusing to overwrite a save: " + name);
+            permittedSaveName = name;
+            try { if (!GameSave.SaveCurrentGame(name)) throw new IOException("Native save creation failed: " + name); }
+            finally { permittedSaveName = null; }
+            var file = new FileInfo(GameSave.SavePath(name));
+            if (!file.Exists || file.Length == 0) throw new IOException("Native save did not produce a nonempty file: " + name);
+        }
+        private static HashSet<int> ToHashSetCompat(this IEnumerable<int> values) => new HashSet<int>(values);
+
+        private sealed class ScanResult
+        {
+            internal List<string> Blockers { get; } = new List<string>();
+            internal List<Tuple<PlanetFactory, int>> Assemblers { get; } = new List<Tuple<PlanetFactory, int>>();
+            internal List<Tuple<PlanetFactory, int>> Labs { get; } = new List<Tuple<PlanetFactory, int>>();
+            internal bool SameTargets(ScanResult other) => Assemblers.SequenceEqual(other.Assemblers) && Labs.SequenceEqual(other.Labs);
+        }
+    }
+}

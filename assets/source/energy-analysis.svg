@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Dark Fog Energy Analysis</title>
+  <desc>Original white technical emblem: a faceted energy shard held within an open analysis ring. Transparent background.</desc>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="8" d="M79 46a96 96 0 0 0-44 99m17 36a96 96 0 0 0 139 16m29-43a96 96 0 0 0-39-105"/>
+    <path stroke-width="5" d="M28 126h21m158 0h21M128 25v20m0 166v20"/>
+    <path stroke-width="8" d="m139 47 36 57-37 105-53-73Z"/>
+    <path stroke-width="5" d="m139 47-13 75-41 14m41-14 49-18m-49 18 12 87"/>
+    <path stroke-width="5" d="m98 91 41-44m8 133-9 29"/>
+  </g>
+  <g fill="#fff"><circle cx="66" cy="57" r="7"/><circle cx="204" cy="182" r="7"/><path d="m168 27 8 8-8 8-8-8Z"/></g>
+</svg>
