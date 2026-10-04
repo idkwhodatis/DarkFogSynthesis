@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "releaseEligible": false,
   "runtimeValidated": false,
   "approvedForRelease": false,
@@ -327,5 +327,6 @@
       "evidence": [],
       "note": "Requires target-game verification on isolated profiles and copied saves."
     }
-  ]
+  ],
+  "testedBuild": null
 }

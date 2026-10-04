@@ -21,6 +21,9 @@ namespace DarkFogSynthesis.Compatibility
             long tick = GameMain.gameTick;
             if (data.factories == null || data.factoryCount < 0 || data.factoryCount > data.factories.Length)
                 throw new InvalidOperationException("Factory inventory is unavailable or inconsistent.");
+            // Defensive snapshots intentionally lose identity. Inspect ALL original buffers first,
+            // including foreign machines which could alias an owned machine's refundable inventory.
+            RequireIndependentBuffers(data);
             var snapshots = new List<RefundBufferSnapshot>();
             for (int f = 0; f < data.factoryCount; ++f)
             {
@@ -60,6 +63,43 @@ namespace DarkFogSynthesis.Compatibility
             RequirePaused(data);
             if (GameMain.gameTick != tick) throw new InvalidOperationException("Simulation advanced during the buffer diagnostic.");
             return RefundLedger.Create(snapshots);
+        }
+
+        private static void RequireIndependentBuffers(GameData data)
+        {
+            var aliases = new RefundBufferAliasGuard();
+            for (int f = 0; f < data.factoryCount; ++f)
+            {
+                PlanetFactory factory = data.factories[f];
+                if (factory == null) continue;
+                FactorySystem system = factory.factorySystem;
+                if (system == null || system.assemblerPool == null || system.labPool == null
+                    || system.assemblerCursor < 0 || system.assemblerCursor > system.assemblerPool.Length
+                    || system.labCursor < 0 || system.labCursor > system.labPool.Length)
+                    throw new InvalidOperationException("Factory component inventory is unavailable or inconsistent.");
+                for (int i = 1; i < system.assemblerCursor; ++i)
+                {
+                    AssemblerComponent component = system.assemblerPool[i];
+                    if (component.id != i) continue;
+                    string owner = "factory[" + f + "].assembler[" + i + "]";
+                    bool owned = OwnedRecipes.Contains(component.recipeId);
+                    aliases.Observe(component.served, owner, nameof(component.served), owned);
+                    aliases.Observe(component.incServed, owner, nameof(component.incServed), owned);
+                    aliases.Observe(component.produced, owner, nameof(component.produced), owned);
+                }
+                for (int i = 1; i < system.labCursor; ++i)
+                {
+                    LabComponent component = system.labPool[i];
+                    if (component.id != i) continue;
+                    string owner = "factory[" + f + "].lab[" + i + "]";
+                    bool owned = OwnedRecipes.Contains(component.recipeId);
+                    aliases.Observe(component.served, owner, nameof(component.served), owned);
+                    aliases.Observe(component.incServed, owner, nameof(component.incServed), owned);
+                    aliases.Observe(component.produced, owner, nameof(component.produced), owned);
+                    aliases.Observe(component.matrixServed, owner, nameof(component.matrixServed), owned);
+                    aliases.Observe(component.matrixIncServed, owner, nameof(component.matrixIncServed), owned);
+                }
+            }
         }
 
         internal static PackageCapacityResult CheckPackageCapacity(Player player, RefundPlan plan)

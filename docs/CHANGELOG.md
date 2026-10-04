@@ -22,3 +22,12 @@ No target-game production, discovery, save migration, cleanup, achievement, Meta
 - Added queued/final anchor, item/cache and loaded-machine checks; rejected altered global research-matrix configurations
 - Added a known-peer sidecar cleanup blocker and read-only idle-buffer inventory/capacity diagnostics; general refund execution remains disabled
 - Verification: 66 pure tests (7,289 assertions), 17 package guards, 15 resource-audit self-tests, clean reference build and metadata audits
+
+### Review regression and allocation follow-up
+
+- Rejected LabOpt's source-confirmed replacement lab paths until a tested adapter exists; detect its actual GUID and declaring patch type on both production overloads
+- Checked original mutable-buffer reference identity before copying refund diagnostics, preventing shared-buffer double counting without rejecting independent equal arrays
+- Separated optional diagnostic exports from fatal registration and latched session conflicts across resume/save, failed loads and teardown; only a different validated session clears the block
+- Bound release acceptance to exact plugin/Core binaries and actual compiler references/configuration; rejected source/runtime symlink roots, ancestors and files
+- Retained live validation while removing execution-check iterator/array allocations, repeated immutable lookup construction and GUI callback churn; documented isolated benchmarks without a game-performance claim
+- Verification: 71 pure tests (15,282 assertions), clean reference compilation and both metadata audits; final package regression totals are in the source-verification record

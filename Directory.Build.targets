@@ -1,0 +1,44 @@
+<Project>
+  <!-- Capture the actual compiler inputs, not guessed HintPath locations. These
+       local sidecars are not distributed: public reports contain identities and
+       hashes without private installation paths. GetAssemblyIdentity reads
+       metadata only; it never executes a game or dependency assembly. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'DarkFogSynthesis' Or '$(MSBuildProjectName)' == 'DarkFogSynthesis.Core'">
+    <DarkFogCaptureBuild>true</DarkFogCaptureBuild>
+    <DarkFogReferenceMode Condition="'$(DarkFogReferenceMode)' == ''">installed-local</DarkFogReferenceMode>
+  </PropertyGroup>
+  <Target Name="CaptureDarkFogCompilerInputs" BeforeTargets="CoreCompile" DependsOnTargets="FindReferenceAssembliesForReferences" Condition="'$(DarkFogCaptureBuild)' == 'true'">
+    <PropertyGroup>
+      <_DarkFogInvocation>$([System.Guid]::NewGuid().ToString('D'))</_DarkFogInvocation>
+      <_DarkFogProvenance>$(TargetDir)$(TargetName).build-inputs.txt</_DarkFogProvenance>
+    </PropertyGroup>
+    <MakeDir Directories="$(TargetDir)" />
+    <!-- Invalidate old success before any capture operation can fail. -->
+    <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="schema|1;invocation|$(_DarkFogInvocation);project|$(MSBuildProjectName);configuration|$(Configuration);referenceMode|$(DarkFogReferenceMode);targetFramework|$(TargetFramework);sdk|$(NETCoreSdkVersion);msbuild|$(MSBuildVersion)" Overwrite="true" Encoding="UTF-8" />
+    <!-- This is the exact item list passed to Csc, including any reference-assembly substitution. -->
+    <GetAssemblyIdentity AssemblyFiles="@(ReferencePathWithRefAssemblies)">
+      <Output TaskParameter="Assemblies" ItemName="_DarkFogReferenceIdentities" />
+    </GetAssemblyIdentity>
+    <ItemGroup>
+      <_DarkFogReferenceFiles Include="%(_DarkFogReferenceIdentities.OriginalItemSpec)">
+        <AssemblyIdentity>%(_DarkFogReferenceIdentities.Identity)</AssemblyIdentity>
+      </_DarkFogReferenceFiles>
+      <_DarkFogInputFiles Include="@(Compile);@(EmbeddedResource);$(MSBuildAllProjects);$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath)" />
+      <_DarkFogInputFiles Include="$(MSBuildThisFileDirectory)Directory.Build.props" Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.props')" />
+      <_DarkFogInputFiles Include="$(MSBuildThisFileDirectory)Local.Build.props" Condition="Exists('$(MSBuildThisFileDirectory)Local.Build.props')" />
+    </ItemGroup>
+    <GetFileHash Files="@(_DarkFogReferenceFiles)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogHashedReferences" />
+    </GetFileHash>
+    <GetFileHash Files="@(_DarkFogInputFiles)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogHashedInputs" />
+    </GetFileHash>
+    <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="@(_DarkFogHashedReferences->'reference|%(FullPath)|%(AssemblyIdentity)|%(FileHash)');@(_DarkFogHashedInputs->'input|%(FullPath)|%(FileHash)')" Encoding="UTF-8" />
+  </Target>
+  <Target Name="CompleteDarkFogBuildCapture" AfterTargets="Build" Condition="'$(DarkFogCaptureBuild)' == 'true' And '$(_DarkFogInvocation)' != ''">
+    <GetFileHash Files="$(TargetPath)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_DarkFogBuiltAssembly" />
+    </GetFileHash>
+    <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="@(_DarkFogBuiltAssembly->'output|%(FullPath)|%(FileHash)');completed|$(_DarkFogInvocation)" Encoding="UTF-8" />
+  </Target>
+</Project>

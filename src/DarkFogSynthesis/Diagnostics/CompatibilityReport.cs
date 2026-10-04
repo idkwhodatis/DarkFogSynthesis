@@ -22,14 +22,14 @@ namespace DarkFogSynthesis.Diagnostics
             }
         }
 
-        internal static string Export(bool registered, string? error)
+        internal static string Export(bool registered, bool sessionReady, string? error)
         {
             string directory = Path.Combine(Paths.ConfigPath, "DarkFogSynthesis", "diagnostics");
             Directory.CreateDirectory(directory);
             string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + System.Guid.NewGuid().ToString("N").Substring(0, 8);
             var report = new
             {
-                schemaVersion = 1,
+                schemaVersion = 2,
                 capturedUtc = DateTime.UtcNow.ToString("O"),
                 status = "EXPERIMENTAL_NOT_GAME_VALIDATED",
                 gameVersion = GameVersion,
@@ -37,6 +37,7 @@ namespace DarkFogSynthesis.Diagnostics
                 clrVersion = Environment.Version.ToString(),
                 pluginVersion = Plugin.Version,
                 prototypesRegistered = registered,
+                sessionReady,
                 error,
                 releaseBlockers = new[] { "Target-version P0 production/discovery checks", "Inventory-preserving cleanup and vanilla reload", "A/B/C/D integrity, achievements, metadata and Milky Way checks", "Measured bilingual technology layout" },
                 assemblies = new[] { typeof(GameData).Assembly, typeof(BaseUnityPlugin).Assembly, typeof(CommonAPIPlugin).Assembly, typeof(xiaoye97.LDBTool).Assembly, typeof(Plugin).Assembly }

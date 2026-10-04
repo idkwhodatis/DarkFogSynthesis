@@ -57,6 +57,8 @@ Only a successfully compiled **experimental runtime ZIP** is installable; the so
 
 No supported game-version combination is currently recorded. Stop on prototype conflicts, unknown-layout warnings, or exceptions; do not change fixed IDs to force a save to load. Never edit integrity flags to make a test pass. 升级前备份存档、旧插件及配置；不要改变已保存的原型 ID。
 
+**LabOpt is currently blocked in every detected version.** Its replacement production path bypasses this mod's native lab adapter and shares lab buffers; an unchanged ordinary matrix list does not make that combination compatible. Use an independent compatible test profile and an untouched copied save. See the [pinned source review](docs/compatibility/labopt-buffer-review.md). Compatibility conflicts keep the session paused and block resume/save until a different session completes validation; no foreign technologies or mod settings are changed.
+
 ## Configuration / 配置
 
 ```ini
@@ -68,7 +70,7 @@ Peace Mode always adds the four agreed combat prerequisites to the four vanilla 
 
 ## Verification and removal / 验收与卸载
 
-[Existing-mod source comparison](docs/compatibility/mod-source-comparison.md) · [Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)
+[Existing-mod source comparison](docs/compatibility/mod-source-comparison.md) · [Review regressions](docs/compatibility/review-regressions.md) · [Bounded performance review](docs/compatibility/performance-review.md) · [Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)
 
 **Do not assume deleting the DLL is safe.** Active machines, research/crafting queues and blueprints may retain custom IDs. A fully validated “Prepare a Vanilla-Compatible Save” operation is not currently established. Retain or restore the untouched pre-Mod backup for ordinary play; do not overwrite it with experimental saves. 不能将“产物全是原版物品”视为安全卸载证明。
 

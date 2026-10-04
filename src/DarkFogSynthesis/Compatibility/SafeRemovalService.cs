@@ -23,7 +23,9 @@ namespace DarkFogSynthesis.Compatibility
         private static int writesInProgress;
         private static bool cleaning;
         private static GameData? quarantinedSession;
-        internal static bool IsQuarantined => quarantinedSession != null && ReferenceEquals(GameMain.data, quarantinedSession);
+        // Keep the quarantine global while a replacement is loading or has failed; merely replacing
+        // GameMain.data is not proof that the next session passed all validation.
+        internal static bool IsQuarantined => quarantinedSession != null;
         private static readonly object SaveGate = new object();
         [ThreadStatic] private static string? permittedSaveName;
 
@@ -43,6 +45,8 @@ namespace DarkFogSynthesis.Compatibility
                 __state = false;
                 lock (SaveGate)
                 {
+                    if (Plugin.Instance != null && Plugin.Instance.IsCompatibilityBlocked)
+                    { __result = false; return false; }
                     if ((cleaning || quarantinedSession != null) && (__originalMethod.Name != nameof(GameSave.SaveCurrentGame) || __args.Length != 1 ||
                         permittedSaveName == null || !string.Equals(__args[0] as string, permittedSaveName, StringComparison.Ordinal)))
                     { __result = false; return false; }
@@ -64,11 +68,13 @@ namespace DarkFogSynthesis.Compatibility
         private static class ResumeGuard
         {
             [HarmonyPrefix]
-            private static bool BeforeResume() => !IsQuarantined;
+            private static bool BeforeResume() => !IsQuarantined &&
+                (Plugin.Instance == null || !Plugin.Instance.IsCompatibilityBlocked);
         }
 
         internal static void OnNewSession(GameData data)
         {
+            // Called only after the replacement's native Begin and late compatibility checks succeed.
             if (quarantinedSession != null && !ReferenceEquals(quarantinedSession, data)) quarantinedSession = null;
         }
 

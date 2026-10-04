@@ -59,14 +59,14 @@
   "verification": {
     "pluginBuild": "passed: zero warnings/errors",
     "pureTests": {
-      "passed": 66,
-      "assertions": 7289
+      "passed": 71,
+      "assertions": 15282
     },
     "packagingGuardTests": {
-      "passed": 17
+      "passed": 35
     },
     "assetsAndLocalization": "passed",
-    "publicApiAccessibility": "passed: 791 direct game member sites, 195 unique members, 46 game types; no nonpublic/unresolved",
+    "publicApiAccessibility": "passed: 820 direct game member sites, 195 unique members, 46 game types; no nonpublic/unresolved",
     "gameAcceptanceCases": {
       "total": 35,
       "executed": 0
@@ -76,7 +76,9 @@
       "passed": 15
     },
     "compiledLocalizationResources": "passed: exact 30-key English/Chinese JSON in main DLL; no satellites",
-    "frameworkRuntimeAssemblyResolution": "not_executed: verify installed Unity profile including System.Web.Extensions"
+    "frameworkRuntimeAssemblyResolution": "not_executed: verify installed Unity profile including System.Web.Extensions",
+    "buildIdentity": "845675040eb916017b1571f3dcca595ae50b7ddd6fb9bbd51bbb795c5f4094f1",
+    "compilerProvenance": "schema 2: exact plugin/Core hashes, actual Csc references (24 plugin / 113 Core), compiler inputs, SDK, configuration and reference mode; private paths excluded from distributed report"
   },
   "distribution": "All reference binaries stayed outside the source tree and are excluded from source/runtime packages. No game was launched or saves altered during these checks."
 }

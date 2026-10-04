@@ -28,7 +28,7 @@ Do not commit `Local.Build.props`, game assemblies, dependency binaries, saves, 
 ./scripts/Package.ps1 -Channel experimental
 ```
 
-`-CoreOnly` runs asset/content checks and the pure-test executable, without claiming runtime compilation. A full build runs the same checks, compiles the plugin against configured local references, runs metadata-only resource and original-API accessibility audits, then records assembly hashes and a build-input fingerprint in `artifacts/build-report.json`. No install/copy-to-game target runs. A failed build does not produce success provenance.
+`-CoreOnly` runs asset/content checks and the pure-test executable, without claiming runtime compilation. A full build runs the same checks, compiles the plugin against configured local references, runs metadata-only resource and original-API accessibility audits, then records schema-v2 build provenance in `artifacts/build-report.json`. This includes exact plugin/Core hashes, resolved compiler-reference identities and hashes, configuration, reference mode, source fingerprint and an unambiguous build identity. No install/copy-to-game target runs. An incomplete or failed capture cannot qualify as current success provenance.
 
 The default `-ReferenceMode installed-local` means references were supplied from the local installation; it still records `installedGameValidated=false` and `runtimeExecution=not_executed`. For an explicitly identified compile-only reference-assembly experiment, pass `-ReferenceMode reference-assembly-smoke`. That classification is preserved in `BUILD-STATUS.json` and the package notice and can produce an experimental package only. Reference-assembly compilation is not an installed-game test and cannot qualify for `release`. Never relabel a reference-assembly compile as a local game build.
 
@@ -38,7 +38,7 @@ On platforms without PowerShell, the content/test commands in the README and `py
 
 - `source-only` (default): source tree beneath a clearly named source directory, plus `PACKAGE-STATUS.json` with `installable=false`; no DLLs or installation claim
 - `experimental`: requires both actual project DLLs plus a matching successful build report; includes own PNGs, source SVGs, documentation, license, icon and dependency manifest. No external binaries
-- `release`: additionally requires an explicitly supplied acceptance report whose 35 IDs all passed in the recorded target game, whose evidence files exist, whose build fingerprint matches, and whose `approvedForRelease`, `runtimeValidated` and `releaseEligible` flags are true
+- `release`: additionally requires an explicitly supplied schema-v2 acceptance report whose 35 IDs all passed in the recorded target game, whose evidence files exist, whose exact tested build (both DLL hashes, compiler dependencies, configuration, reference mode and build identity) matches the current verified candidate, and whose `approvedForRelease`, `runtimeValidated` and `releaseEligible` flags are true
 
 ```powershell
 ./scripts/Package.ps1 -Channel release -AcceptancePath docs/compatibility/acceptance-status.json
@@ -48,7 +48,36 @@ This command **must fail with the checked-in unverified report**. A compiler con
 
 All required checks, including online I03, must have real evidence. I03 must explicitly record authorization for the online test. Do not upload experimental save data merely to satisfy a checklist. Evidence belongs under `docs/compatibility/evidence/`; remove personal information before including it in a package. Never put save binaries, credentials or game DLLs there.
 
-A deterministic ZIP includes only allowlisted file types and ignores `bin`, `obj`, symlinks, private build settings and VCS metadata. Runtime DLLs are explicitly limited to `DarkFogSynthesis.dll` and `DarkFogSynthesis.Core.dll`; their hashes must match current build provenance. ZIP entries receive a fixed timestamp and a SHA-256 inventory. Existing output ZIPs are not silently overwritten; use a fresh `-OutputDirectory` / `--output-dir`.
+A deterministic ZIP includes only allowlisted file types and ignores `bin`, `obj`, private build settings and VCS metadata. Source roots, project-root ancestors, traversed directories and individual inputs must not be symlinks; violations fail closed before reading the linked content. All package inputs, including runtime assets, DLLs, audits and the explicit acceptance report, must resolve beneath the project root. Compiler references may reside outside the project, but are never packaged and must still match their recorded local hashes. Runtime DLLs are explicitly limited to `DarkFogSynthesis.dll` and `DarkFogSynthesis.Core.dll`; their hashes must match current build provenance. ZIP contents and the SHA-256 inventory use the same captured bytes. Entries receive a fixed timestamp. Existing output ZIPs are not silently overwritten; use a fresh `-OutputDirectory` / `--output-dir`.
+
+## Exact-build acceptance binding
+
+`Directory.Build.targets` captures `ReferencePathWithRefAssemblies`, the resolved item list actually passed to the C# compiler, immediately before `CoreCompile` for both production projects. It uses MSBuild's metadata-only `GetAssemblyIdentity` and SHA-256 `GetFileHash` tasks; it does not infer assembly identities from filenames or configured search directories. This covers the game, Unity, BepInEx/Harmony, CommonAPI/LDBTool and framework references, including `System.Web.Extensions`, as well as Core's own compiler references. Source/resource/build-input hashes are captured too. Completion appends the emitted assembly's hash only after a successful `Build` target. A unique invocation ID distinguishes rebuilds even when output bytes are identical.
+
+Ignored `bin/.../*.build-inputs.txt` sidecars retain the actual local paths for revalidation. Do not publish them: they can contain private installation paths. Build/package validation re-hashes the captured files and rejects absent, altered, incomplete or mismatched captures. The public `BUILD-STATUS.json` contains metadata identities and hashes without local paths; its `buildIdentity` is a SHA-256 digest over all binding fields. The API audit's game hash must equal the actual compiler-resolved game reference, not merely any supplied game DLL.
+
+Before beginning acceptance, freeze the candidate and print its validated binding:
+
+```sh
+python scripts/package.py --tested-build --configuration Release
+```
+
+Record this entire object as `testedBuild` in a separate schema-v2 acceptance report inside the project. Also retain its `sourceFingerprint` in the report's top-level field. Preserve the tested DLLs, dependencies, sidecars and build report throughout acceptance. Never regenerate the binding from a newer build to make old evidence pass. Rebuilds, changed binaries, changed references, configuration/mode changes, and missing binding fields require new matching acceptance. `--fingerprint` alone is insufficient. Record actual installed package versions separately from assembly versions; BepInEx, CommonAPI and LDBTool's recorded assembly versions/hashes must match the compiler references. DSPModSave is a runtime-only transitive dependency and still needs its own observed version/hash and target-game evidence; compilation does not validate it.
+
+The checked-in `testedBuild` is intentionally null and all release flags remain false. Neither this binding command nor a successful compile records any game-test pass or grants release approval. Release ZIPs include the supplied report as `RELEASE-ACCEPTANCE.json`.
+
+For direct builds without PowerShell, run all pure tests first, then build the runtime project with the same explicit mode used when recording provenance:
+
+```sh
+dotnet clean src/DarkFogSynthesis/DarkFogSynthesis.csproj -c Release
+dotnet build src/DarkFogSynthesis/DarkFogSynthesis.csproj -c Release -p:DarkFogReferenceMode=reference-assembly-smoke
+# Run ResourceAudit against the captured output and both localization sources.
+# Run PublicApiAudit against the captured Assembly-CSharp reference and resolved reference directories.
+# Both successful JSON reports must be under artifacts/ before this command:
+python scripts/package.py --record-build --configuration Release --reference-mode reference-assembly-smoke
+```
+
+Use `installed-local` only for actual installed references. Configured reference-path properties can also be passed to `dotnet build` with `-p:`. Do not build Core again after recording a candidate: another invocation changes its captured identity and invalidates that candidate. Run audits and packaging only after all builds stop; concurrent input changes are refused.
 
 ## Declared dependency evidence (2026-10-04)
 

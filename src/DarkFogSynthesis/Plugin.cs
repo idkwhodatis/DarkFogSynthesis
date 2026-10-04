@@ -9,6 +9,8 @@ using DarkFogSynthesis.Progression;
 using DarkFogSynthesis.Registration;
 using DarkFogSynthesis.Core.Definitions;
 using DarkFogSynthesis.Core.Progression;
+using DarkFogSynthesis.Core.Compatibility;
+using DarkFogSynthesis.Core.Registration;
 using System.Linq;
 using HarmonyLib;
 using UnityEngine;
@@ -26,8 +28,11 @@ namespace DarkFogSynthesis
         public const string Version = "0.1.0";
         internal static Plugin Instance { get; private set; } = null!;
         private readonly ContentRegistry registry = new ContentRegistry();
+        private readonly SessionCompatibilityState compatibility = new SessionCompatibilityState();
         internal RuntimeProgression Progression { get; } = new RuntimeProgression();
-        internal bool Ready => registry.Ready && fatal == null && !SafeRemovalService.IsQuarantined;
+        internal bool Ready => registry.Ready && fatal == null && !compatibility.IsBlocked && !SafeRemovalService.IsQuarantined;
+        internal bool IsCompatibilityBlocked => compatibility.IsBlocked;
+        private string? BlockingReason => fatal ?? compatibility.BlockReason;
         private Harmony harmony = null!;
         private ConfigEntry<bool> nonPeaceSetting = null!;
         private bool nonPeaceAtStartup;
@@ -36,6 +41,7 @@ namespace DarkFogSynthesis
         private bool showDiagnostics = true;
         private bool confirmRemoval;
         private bool cleanupCandidate;
+        private GUI.WindowFunction? drawDiagnostics;
         private Rect window = new Rect(20, 20, 560, 260);
 
         private void Awake()
@@ -64,27 +70,39 @@ namespace DarkFogSynthesis
 
         private void BindContent()
         {
-            try
-            {
+            RegistrationLifecycle.BindAndDiagnose(() => {
                 registry.BindAndValidate();
                 status = "Registered 2 technologies and 6 recipes. This game layout, discovery behavior and save cleanup remain unverified; use copied diagnostic saves only.";
                 Logger.LogInfo(status);
-                Logger.LogInfo("Runtime diagnostic snapshot: " + CompatibilityReport.Export(Ready, fatal));
-            }
-            catch (Exception error) { Fail(error); throw; }
+            }, Fail,
+                () => Logger.LogInfo("Runtime diagnostic snapshot: " + CompatibilityReport.Export(registry.Ready, Ready, BlockingReason)),
+                error => {
+                    status += " Automatic diagnostic export failed: " + error.Message;
+                    Logger.LogWarning("Content registration succeeded, but automatic diagnostics could not be exported: " + error);
+                });
         }
 
         internal void EnsureReady()
+        {
+            EnsureRegistryReady();
+            if (compatibility.IsBlocked || SafeRemovalService.IsQuarantined)
+                throw new InvalidOperationException("DarkFogSynthesis cannot safely use this session: " +
+                    (compatibility.BlockReason ?? "this removal-candidate session is quarantined; load a different valid session"));
+        }
+
+        // Preparing a replacement must remain possible while the old session's block is latched.
+        internal void EnsureRegistryReady()
         {
             if (!registry.Ready || fatal != null) throw new InvalidOperationException("DarkFogSynthesis cannot safely enter this save: " + (fatal ?? "prototype initialization did not finish"));
             registry.Validate();
             registry.ValidateExecutionCache();
             NativeRecipeCompatibility.ValidateSupportedMatrixRegistry();
+            RuntimeCompatibilityGuard.ValidateSupportedPeers();
         }
 
         internal void ApplyMode(bool peace)
         {
-            EnsureReady();
+            EnsureRegistryReady();
             Progression.Apply(peace, nonPeaceAtStartup);
             cleanupCandidate = false;
         }
@@ -93,27 +111,56 @@ namespace DarkFogSynthesis
         internal void ValidateImportedAssembler(AssemblerComponent machine) => registry.ValidateImportedAssembler(machine);
         internal void ValidateImportedLab(LabComponent machine) => registry.ValidateImportedLab(machine);
 
-        internal void AbortSession(Exception error)
+        internal void BeginSession(GameData data) => compatibility.BeginSession(data);
+        internal void EnsureSessionCanBegin(GameData data) => compatibility.EnsureCanBegin(data);
+        internal void EndSession(GameData data) => compatibility.EndSession(data);
+        internal void CompleteValidatedSession(GameData data)
         {
-            try { Progression.Restore(); }
-            catch (Exception restoreError) { Logger.LogError(restoreError); }
-            Fail(error);
+            bool wasBlocked = compatibility.IsBlocked;
+            compatibility.CompleteValidatedSession(data);
+            if (wasBlocked)
+                status = "The new session passed compatibility checks. This experimental build still requires copied diagnostic saves; gameplay and removal remain unverified.";
         }
 
-        internal void DiagnoseLateConflicts()
+        internal void RejectSession(GameData? data, Exception error)
         {
-            NativeRecipeCompatibility.ValidateSupportedMatrixRegistry();
-            var required = FrozenContent.Technologies.SelectMany(t => t.ExplicitPrerequisites.Concat(t.ImplicitPrerequisites));
-            if (GameMain.data != null && ProgressionPolicy.ShouldApply(GameMain.data.gameDesc.isPeaceMode, nonPeaceAtStartup))
-                required = required.Concat(FrozenContent.CombatPrerequisites.Select(e => e.RequiredCombatTech));
-            var unavailable = required.Distinct().Where(id => LDB.techs.Select(id.Value) == null ||
-                !LDB.techs.Select(id.Value).Published || LDB.techs.Select(id.Value).IsObsolete).Select(id => id.ToString()).ToArray();
-            if (unavailable.Length == 0) return;
-            status = "CONFLICT: another mod disabled required technologies: " + string.Join(", ", unavailable) +
-                ". Review that mod's combat-technology settings, then restart. No technologies or other mod settings were changed. / 前置科技被其他 Mod 禁用，请检查配置并重启。";
+            BlockSession(data, error.Message);
+            Logger.LogError(error);
+        }
+
+        internal void AbortSession(GameData? data, Exception error)
+        {
+            RejectSession(data, error);
+            try { Progression.Restore(); }
+            catch (Exception restoreError) { Logger.LogError(restoreError); }
+        }
+
+        internal bool DiagnoseLateConflicts()
+        {
+            try
+            {
+                EnsureRegistryReady();
+                var required = FrozenContent.Technologies.SelectMany(t => t.ExplicitPrerequisites.Concat(t.ImplicitPrerequisites));
+                if (GameMain.data != null && ProgressionPolicy.ShouldApply(GameMain.data.gameDesc.isPeaceMode, nonPeaceAtStartup))
+                    required = required.Concat(FrozenContent.CombatPrerequisites.Select(e => e.RequiredCombatTech));
+                var unavailable = required.Distinct().Where(id => LDB.techs.Select(id.Value) == null ||
+                    !LDB.techs.Select(id.Value).Published || LDB.techs.Select(id.Value).IsObsolete).Select(id => id.ToString()).ToArray();
+                if (unavailable.Length == 0) return true;
+                BlockSession(GameMain.data, "CONFLICT: another mod disabled required technologies: " + string.Join(", ", unavailable) +
+                    ". Review that mod's combat-technology settings, then restart. No technologies or other mod settings were changed. / 前置科技被其他 Mod 禁用，请检查配置并重启。");
+            }
+            catch (Exception error) { BlockSession(GameMain.data, error.Message); }
+            return false;
+        }
+
+        private void BlockSession(GameData? data, string reason)
+        {
+            compatibility.BlockSession(data, reason);
+            status = "BLOCKED: " + reason;
+            confirmRemoval = false;
             showDiagnostics = true;
             Logger.LogError(status);
-            GameMain.Pause();
+            if (GameMain.data != null && GameMain.isRunning) GameMain.Pause();
         }
 
         private void Fail(Exception error)
@@ -131,16 +178,18 @@ namespace DarkFogSynthesis
                 if (GUI.Button(new Rect(12, 12, 190, 28), "Dark Fog Synthesis [test]")) showDiagnostics = true;
                 return;
             }
-            window = GUILayout.Window(195148101, window, DrawDiagnostics, "Dark Fog Synthesis 0.1.0 · EXPERIMENTAL");
+            window = GUILayout.Window(195148101, window, drawDiagnostics ??= DrawDiagnostics, "Dark Fog Synthesis 0.1.0 · EXPERIMENTAL");
         }
 
         private void DrawDiagnostics(int id)
         {
-            GUILayout.Label(status);
+            // Export/preview messages must never hide the persistent reason that resuming is refused.
+            if (BlockingReason != null) GUILayout.Label("BLOCKED: " + BlockingReason);
+            if (BlockingReason == null || status != "BLOCKED: " + BlockingReason) GUILayout.Label(status);
             if (nonPeaceSetting.Value != nonPeaceAtStartup) GUILayout.Label("Progression setting changed: restart the game for it to take effect.");
             if (GUILayout.Button("Export runtime diagnostics / 导出运行时诊断"))
             {
-                try { status = "Diagnostics saved: " + CompatibilityReport.Export(Ready, fatal); Logger.LogInfo(status); }
+                try { status = "Diagnostics saved: " + CompatibilityReport.Export(registry.Ready, Ready, BlockingReason); Logger.LogInfo(status); }
                 catch (Exception error) { status = "Diagnostic export failed: " + error.Message; Logger.LogError(error); }
             }
             if (Ready && GameMain.data != null && !GameMain.isLoading && !cleanupCandidate)

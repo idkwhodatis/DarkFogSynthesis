@@ -18,8 +18,12 @@ namespace DarkFogSynthesis.Compatibility
         private static void BeforeImport(GameData __instance, out bool __state)
         {
             __state = false;
-            Plugin.Instance.EnsureReady();
-            BeginTransition(__instance);
+            try
+            {
+                Plugin.Instance.EnsureRegistryReady();
+                BeginTransition(__instance);
+            }
+            catch (Exception error) { Plugin.Instance.RejectSession(__instance, error); throw; }
             __state = true;
             importing = __instance;
             descriptorApplied = false;
@@ -65,8 +69,12 @@ namespace DarkFogSynthesis.Compatibility
         private static void BeforeNewGame(GameData __instance, GameDesc _gameDesc, out bool __state)
         {
             __state = false;
-            Plugin.Instance.EnsureReady();
-            BeginTransition(__instance);
+            try
+            {
+                Plugin.Instance.EnsureRegistryReady();
+                BeginTransition(__instance);
+            }
+            catch (Exception error) { Plugin.Instance.RejectSession(__instance, error); throw; }
             __state = true;
             Plugin.Instance.ApplyMode(_gameDesc.isPeaceMode);
             sessionPeaceMode = _gameDesc.isPeaceMode;
@@ -91,12 +99,12 @@ namespace DarkFogSynthesis.Compatibility
         [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyPrefix, HarmonyPriority(Priority.First)]
         private static void BeforeBegin()
         {
-            Plugin.Instance.EnsureReady();
+            Plugin.Instance.EnsureRegistryReady();
             // Do not repair a late/unrecognized path after native history/queue initialization already ran.
             if (!ReferenceEquals(session, GameMain.data) || !sessionPeaceMode.HasValue ||
                 GameMain.data.gameDesc == null || sessionPeaceMode.Value != GameMain.data.gameDesc.isPeaceMode)
                 throw new InvalidOperationException("Unsupported or changed session initialization order. The mode policy must be applied before history/queue initialization.");
-            SafeRemovalService.OnNewSession(GameMain.data);
+            Plugin.Instance.EnsureSessionCanBegin(GameMain.data);
             Plugin.Instance.ValidateLoadedMachines(GameMain.data);
             SaveReconciler.Reconcile(GameMain.data.history);
             GameMain.data.history.VerifyTechQueue();
@@ -105,16 +113,25 @@ namespace DarkFogSynthesis.Compatibility
         [HarmonyPatch(typeof(GameData), nameof(GameData.Destroy)), HarmonyPostfix]
         private static void OnSessionDestroyed(GameData __instance) => RestoreSession(__instance);
 
-        [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyPostfix, HarmonyPriority(Priority.Last)]
-        private static void AfterBegin() => Plugin.Instance.DiagnoseLateConflicts();
-
-        [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyFinalizer]
+        [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin)), HarmonyFinalizer, HarmonyPriority(Priority.Last)]
         private static Exception? BeginFailed(Exception? __exception)
         {
+            // All original/postfix work must finish before a replacement can release either latch.
+            // In particular, a foreign late postfix may disable required technologies or replace lab hooks.
+            if (__exception == null)
+            {
+                try
+                {
+                    if (!Plugin.Instance.DiagnoseLateConflicts()) return null;
+                    Plugin.Instance.CompleteValidatedSession(GameMain.data);
+                    SafeRemovalService.OnNewSession(GameMain.data);
+                }
+                catch (Exception error) { __exception = error; }
+            }
             if (__exception != null)
             {
                 if (GameMain.data != null && GameMain.isRunning) GameMain.Pause();
-                Plugin.Instance.AbortSession(__exception);
+                Plugin.Instance.AbortSession(GameMain.data, __exception);
             }
             return __exception;
         }
@@ -125,6 +142,7 @@ namespace DarkFogSynthesis.Compatibility
             {
                 if (transition != null) throw new InvalidOperationException("Concurrent/nested game-data initialization is unsupported.");
                 Plugin.Instance.Progression.Restore();
+                Plugin.Instance.BeginSession(data);
                 transition = data;
                 session = data;
                 sessionPeaceMode = null;
@@ -138,7 +156,8 @@ namespace DarkFogSynthesis.Compatibility
                 if (ReferenceEquals(transition, data)) transition = null;
                 if (error != null && ReferenceEquals(session, data))
                 {
-                    Plugin.Instance.AbortSession(error);
+                    Plugin.Instance.AbortSession(data, error);
+                    Plugin.Instance.EndSession(data);
                     session = null;
                     sessionPeaceMode = null;
                 }
@@ -152,6 +171,7 @@ namespace DarkFogSynthesis.Compatibility
                 // A menu preview or old GameData can be destroyed after another save was prepared.
                 if (!ReferenceEquals(session, data)) return;
                 Plugin.Instance.Progression.Restore();
+                Plugin.Instance.EndSession(data);
                 session = null;
                 sessionPeaceMode = null;
                 if (ReferenceEquals(transition, data)) transition = null;

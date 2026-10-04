@@ -13,7 +13,7 @@ No legally installed target game is present in this implementation environment. 
 3. Create A (vanilla), B (dependencies), C (dependencies + mod) and later D (cleaned vanilla) from the same copied save; record pre-existing flags and never erase them
 4. Record each case as `passed`, `failed`, `not_executed` or `environment_limited`, with setup, actions, observed results, logs/screenshots and inventory/flag deltas. Use a unique evidence path per run
 5. Do not auto-upload save data. I03 needs explicit tester authorization. Offline/online-service failures are `environment_limited`, never a pass
-6. Repeat affected checks after code, ID, dependency or game-version changes. Bind acceptance to `python scripts/package.py --fingerprint`; release packaging refuses missing or stale acceptance
+6. Before testing, use `python scripts/package.py --tested-build` to freeze the candidate's validated exact-build binding, then record the entire object as `testedBuild` in the schema-v2 acceptance report. Retain its source fingerprint at the top level too. Repeat affected checks after code, ID, binary, dependency, configuration or game-version changes; a source fingerprint alone cannot qualify a different build. See [the binding contract](build.md#exact-build-acceptance-binding)
 
 ## Focused P0 evidence still required
 
@@ -78,4 +78,4 @@ For I01–I03, inspect flags and user-visible warnings after registration, load,
 
 `compatibility/acceptance-status.json` is the machine-readable report. No release flag is true. `compatibility/tech-layout.json` contains candidate coordinates only. `compatibility/proto-ids.json` fixes project IDs but does not claim global reservation or a live collision scan. `compatibility/vanilla-proto-snapshot.json` is an intentionally empty target-export template.
 
-`release` packaging requires every matrix ID exactly once with target-game execution, `passed` status, real evidence files, an actual environment record, source fingerprint and explicit release approval. Conservative guards are not themselves proof of compatibility.
+`release` packaging requires every matrix ID exactly once with target-game execution, `passed` status, real evidence files, an actual environment record, exact plugin/Core DLL hashes, resolved compiler-reference identities/hashes, configuration, reference mode, source fingerprint, matching build identity and explicit release approval. The candidate's local files and build/audit reports must still match the tested binding; missing, stale or different-binary evidence is refused. Conservative guards are not themselves proof of compatibility.

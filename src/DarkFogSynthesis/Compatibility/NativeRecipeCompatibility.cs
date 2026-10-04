@@ -126,8 +126,9 @@ namespace DarkFogSynthesis.Compatibility
             // state and every other recipe. Native six-matrix white index is 6; no production
             // buffer, time, extra product, energy, or proliferation field is written here.
             // A rejected ID collision must not adapt somebody else's recipe with this ID.
-            if (Plugin.Instance != null && Plugin.Instance.Ready &&
-                __instance.recipeId == ProtoIds.DarkFogMatrix.Value && __result != 0U)
+            // This postfix runs for every production lab; unrelated/idle calls need no mod-state lookup.
+            if (__instance.recipeId != ProtoIds.DarkFogMatrix.Value || __result == 0U) return;
+            if (Plugin.Instance != null && Plugin.Instance.Ready)
                 __result = NativeMatrixContract.IsSupported(LabComponent.matrixIds) ? 6U : 0U;
         }
 

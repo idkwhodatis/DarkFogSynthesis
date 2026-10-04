@@ -15,6 +15,10 @@ namespace DarkFogSynthesis.Registration
     /// <summary>Queues content once, then binds references only after both prototype sets exist.</summary>
     internal sealed class ContentRegistry
     {
+        // Only immutable definitions are cached. Live prototype identity and execution arrays are
+        // still read and validated at every existing import/session checkpoint.
+        private static readonly IReadOnlyDictionary<int, RecipeDefinition> recipeDefinitions =
+            FrozenContent.Recipes.ToDictionary(r => r.Id.Value);
         private readonly Dictionary<int, RecipeProto> recipes = new Dictionary<int, RecipeProto>();
         private readonly Dictionary<int, TechProto> technologies = new Dictionary<int, TechProto>();
         private bool queued;
@@ -205,7 +209,6 @@ namespace DarkFogSynthesis.Registration
         {
             // A valid global cache does not establish that existing machines refer to matching execute data.
             // Validate only our recipe IDs; do not globally replace other mods' buffers or execution references.
-            var definitions = FrozenContent.Recipes.ToDictionary(r => r.Id.Value);
             for (int f = 0; f < game.factoryCount; ++f)
             {
                 var factory = game.factories[f];
@@ -214,18 +217,18 @@ namespace DarkFogSynthesis.Registration
                 for (int i = 1; i < system.assemblerCursor; ++i)
                 {
                     var machine = system.assemblerPool[i];
-                    if (machine.id != i || !definitions.TryGetValue(machine.recipeId, out var definition)) continue;
-                    Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
-                        BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
-                        "Saved assembler cache/buffer shape mismatch for recipe " + definition.Id + " on planet " + factory.planetId);
+                    if (machine.id != i || !recipeDefinitions.TryGetValue(machine.recipeId, out var definition)) continue;
+                    if (!ExecutionMatches(machine.recipeExecuteData, definition) ||
+                        !BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition))
+                        throw new InvalidOperationException("Saved assembler cache/buffer shape mismatch for recipe " + definition.Id + " on planet " + factory.planetId);
                 }
                 for (int i = 1; i < system.labCursor; ++i)
                 {
                     var machine = system.labPool[i];
-                    if (machine.id != i || machine.researchMode || !definitions.TryGetValue(machine.recipeId, out var definition)) continue;
-                    Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
-                        BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
-                        "Saved lab cache/buffer shape mismatch for recipe " + definition.Id + " on planet " + factory.planetId);
+                    if (machine.id != i || machine.researchMode || !recipeDefinitions.TryGetValue(machine.recipeId, out var definition)) continue;
+                    if (!ExecutionMatches(machine.recipeExecuteData, definition) ||
+                        !BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition))
+                        throw new InvalidOperationException("Saved lab cache/buffer shape mismatch for recipe " + definition.Id + " on planet " + factory.planetId);
                 }
             }
         }
@@ -233,7 +236,7 @@ namespace DarkFogSynthesis.Registration
         internal void ValidateImportedAssembler(AssemblerComponent machine)
         {
             if (machine.id <= 0 || !OwnsRecipe(machine.recipeId)) return;
-            var definition = FrozenContent.Recipes.Single(r => r.Id.Value == machine.recipeId);
+            var definition = recipeDefinitions[machine.recipeId];
             Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
                 BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
                 "Owned assembler import has incompatible execute data or buffer shape. Load stopped before LDBTool's known buffer sanitizer; no replacement arrays were created.");
@@ -242,18 +245,15 @@ namespace DarkFogSynthesis.Registration
         internal void ValidateImportedLab(LabComponent machine)
         {
             if (machine.id <= 0 || machine.researchMode || !OwnsRecipe(machine.recipeId)) return;
-            var definition = FrozenContent.Recipes.Single(r => r.Id.Value == machine.recipeId);
+            var definition = recipeDefinitions[machine.recipeId];
             Require(ExecutionMatches(machine.recipeExecuteData, definition) &&
                 BufferShapeMatches(machine.served, machine.incServed, machine.produced, definition),
                 "Owned lab import has incompatible execute data or buffer shape. Load stopped without clearing its buffers.");
         }
 
-        private static bool ExecutionMatches(RecipeExecuteData? data, RecipeDefinition definition) => data != null && data.productive &&
-            data.timeSpend == definition.TimeSpendTicks * 10000 && data.extraTimeSpend == definition.TimeSpendTicks * 100000 &&
-            data.requires != null && data.requires.SequenceEqual(definition.Inputs.Select(i => i.Item.Value)) &&
-            data.requireCounts != null && data.requireCounts.SequenceEqual(definition.Inputs.Select(i => i.Count)) &&
-            data.products != null && data.products.SequenceEqual(new[] { definition.Output.Item.Value }) &&
-            data.productCounts != null && data.productCounts.SequenceEqual(new[] { definition.Output.Count });
+        private static bool ExecutionMatches(RecipeExecuteData? data, RecipeDefinition definition) => data != null &&
+            RecipeExecutionContract.Matches(definition, data.productive, data.timeSpend, data.extraTimeSpend,
+                data.requires, data.requireCounts, data.products, data.productCounts);
 
         private static bool BufferShapeMatches(int[]? served, int[]? inc, int[]? produced, RecipeDefinition definition) =>
             RecipeBufferContract.Matches(definition, served, inc, produced);

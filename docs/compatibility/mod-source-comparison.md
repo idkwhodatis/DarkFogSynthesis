@@ -44,6 +44,8 @@ Genesis documents why native lab production encodes a visual state from the outp
 
 We keep our separate recipe choice and recipe-only visual correction, and now require the original six matrix IDs/order before applying that supported configuration. No matrix registry or research slot is changed. This rejects altered-matrix overhauls rather than claiming an untested combination works; it does not prove animation or stacking correctness in-game.
 
+The subsequent [LabOpt and shared-buffer review](labopt-buffer-review.md) identifies an additional incompatible production replacement that leaves those six IDs unchanged. Both `FactorySystem.GameTickLabProduceMode` overloads are transpiled to LabOpt's own helper, bypassing our native `LabComponent` postfix. All loaded/unqualified LabOpt versions are therefore blocked at session entry and late validation until a tested adapter exists. The six-ID check alone is not a compatibility certificate.
+
 ## P4: useful refund foundations, with execution still blocked
 
 Additional maintained automation source was inspected specifically for native inventory handling:
@@ -53,6 +55,8 @@ Additional maintained automation source was inspected specifically for native in
 - [UXAssist](https://github.com/soarqin/DSP_Mods/blob/9fc2723bcaa3b4b0a13e47477f70f2bf697edf98/UXAssist/Functions/PlanetFunctions.cs#L207-L231) accounts for current RecipeExecuteData buffers and proliferation points. MIT
 
 Independent adaptations now provide an immutable idle-buffer ledger and a read-only capacity diagnostic. All packets use one detached package copy, preventing several items from incorrectly reserving the same empty slot. Exact mixed proliferation points are retained rather than averaging away remainders. Malformed, overflowing, active-cycle or research state is rejected; the original package is checked for unchanged identity, contents and cache counters.
+
+Before copying those snapshots, the diagnostic now checks the original mutable arrays by reference identity across all instantiated factories. A positive-length array shared with a refundable machine is refused, including cross-field and owned/unowned aliases; distinct arrays with identical values remain independent. This closes double-counting in a shared-buffer stack without inventing ownership or refunding anything.
 
 This is deliberately not a refund action. Public callers establish API usage, but not exact native receiver routing, in-flight production, forge parent/child cancellation, research fractional-point handling, or every side effect that rollback must reverse. A copied machine buffer must never be restored while already-credited player/delivery/ground items remain, which would duplicate inventory. Those target-game semantics remain to be inspected/tested before enabling general P4 mutation. The current candidate cleanup still requires drained/idle state.
 

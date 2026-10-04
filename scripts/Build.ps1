@@ -32,22 +32,22 @@ try {
         # Remove stale localization satellites left by older builds before checking the complete output tree.
         & $DotNet clean src/DarkFogSynthesis/DarkFogSynthesis.csproj --configuration $Configuration
         if ($LASTEXITCODE -ne 0) { throw 'Runtime build-output cleanup failed.' }
-        & $DotNet build src/DarkFogSynthesis/DarkFogSynthesis.csproj --configuration $Configuration
+        & $DotNet build src/DarkFogSynthesis/DarkFogSynthesis.csproj --configuration $Configuration "-p:DarkFogReferenceMode=$ReferenceMode"
         if ($LASTEXITCODE -ne 0) { throw 'Runtime compilation failed. Do not create an installable package; source-only packaging remains available.' }
-        # Resolve imported Local.Build.props and configuration values through MSBuild, not a second XML parser.
-        $PropertyOutput = & $DotNet msbuild src/DarkFogSynthesis/DarkFogSynthesis.csproj -nologo "-property:Configuration=$Configuration" '-getProperty:DSPManagedDir,BepInExDir,CommonApiDir,LdbToolDir,TargetPath'
-        if ($LASTEXITCODE -ne 0) { throw 'Could not resolve runtime output/reference paths through MSBuild (SDK 8+ is required).' }
-        $Properties = ($PropertyOutput -join "`n" | ConvertFrom-Json).Properties
-        foreach ($Name in @('DSPManagedDir', 'BepInExDir', 'CommonApiDir', 'LdbToolDir', 'TargetPath')) {
-            if ([string]::IsNullOrWhiteSpace($Properties.$Name)) { throw "MSBuild returned an empty $Name." }
-        }
-        $RuntimeDll = [System.IO.Path]::GetFullPath($Properties.TargetPath)
-        $ManagedDir = [System.IO.Path]::GetFullPath($Properties.DSPManagedDir)
-        $GameDll = Join-Path $ManagedDir 'Assembly-CSharp.dll'
+        # Audit the exact game reference resolved by the successful compilation.
+        # ResolveAssemblyReferences may choose a different input than a HintPath.
+        $CapturePath = "src/DarkFogSynthesis/bin/$Configuration/net472/DarkFogSynthesis.build-inputs.txt"
+        $Capture = Get-Content -LiteralPath $CapturePath
+        $RuntimeDll = (($Capture | Where-Object { $_.StartsWith('output|') }) -split '\|')[1]
+        $References = @($Capture | Where-Object { $_.StartsWith('reference|') } | ForEach-Object { ,($_ -split '\|') })
+        $GameReferences = @($References | Where-Object { $_[2].StartsWith('Assembly-CSharp,') })
+        if ($GameReferences.Count -ne 1) { throw 'Expected exactly one resolved Assembly-CSharp compiler reference.' }
+        $GameDll = $GameReferences[0][1]
+        $SearchDirectories = @($References | ForEach-Object { Split-Path -Parent $_[1] } | Select-Object -Unique)
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
         & $DotNet run --project scripts/ResourceAudit/ResourceAudit.csproj --configuration $Configuration -- $RuntimeDll src/DarkFogSynthesis/Localization --json-report artifacts/resource-audit.json
         if ($LASTEXITCODE -ne 0) { throw 'Runtime localization resources failed audit. Build provenance was not recorded.' }
-        $ApiOutput = & $DotNet run --project scripts/PublicApiAudit/PublicApiAudit.csproj --configuration $Configuration -- $RuntimeDll $GameDll $ManagedDir $Properties.BepInExDir $Properties.CommonApiDir $Properties.LdbToolDir --json-report artifacts/public-api-audit.json 2>&1
+        $ApiOutput = & $DotNet run --project scripts/PublicApiAudit/PublicApiAudit.csproj --configuration $Configuration -- $RuntimeDll $GameDll @SearchDirectories --json-report artifacts/public-api-audit.json 2>&1
         $ApiExitCode = $LASTEXITCODE
         $ApiOutput | Tee-Object -FilePath artifacts/public-api-audit.txt | Write-Host
         if ($ApiExitCode -ne 0) { throw 'Runtime public API accessibility audit failed. Build provenance was not recorded.' }
