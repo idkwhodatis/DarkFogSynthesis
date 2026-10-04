@@ -59,7 +59,7 @@ def run(dotnet: str) -> None:
                     "DarkFogSynthesis.Core", "netstandard2.0", "Release",
                     "reference-assembly-smoke", output, inventory)
             except ValueError as error:
-                captured = {Path(parts[1]).relative_to(root).as_posix(): parts[2].lower()
+                captured = {Path(parts[1]).resolve().relative_to(root.resolve()).as_posix(): parts[2].lower()
                             for line in sidecar.read_text(encoding="utf-8-sig").splitlines()
                             if (parts := line.split("|"))[0] == "inventory"}
                 raise ValueError(
@@ -103,7 +103,10 @@ def run(dotnet: str) -> None:
             validate()
             check(b"BuildCaptureProbeMarker" in output.read_bytes(),
                   "Repaired source marker is absent from real PE metadata")
-            check(str(marker) in sidecar.read_text(encoding="utf-8-sig"),
+            compiled_paths = {Path(parts[1]).resolve()
+                              for line in sidecar.read_text(encoding="utf-8-sig").splitlines()
+                              if (parts := line.split("|"))[0] == "compile"}
+            check(marker.resolve() in compiled_paths,
                   "New source is absent from the successful compiler capture")
 
             # A provenance-generating build must actually run the compiler, not
