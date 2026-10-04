@@ -44,6 +44,8 @@ On platforms without PowerShell, the content/test commands in the README and `py
 ./scripts/Package.ps1 -Channel release -AcceptancePath docs/compatibility/acceptance-status.json
 ```
 
+`-AcceptancePath` / `--acceptance` accepts an absolute path or a path relative to the caller's current working directory, including nested paths and `.` / `..` components. The report must still resolve inside the project. Symlinked files, directories and project-root ancestors are rejected before path normalization; relative paths do not bypass these safeguards.
+
 This command **must fail with the checked-in unverified report**. A compiler configuration called `Release` does not satisfy acceptance. The package guard checks data and evidence existence; it cannot determine whether a human's claimed gameplay evidence is truthful. Record real results, never flip flags merely to make packaging succeed.
 
 All required checks, including online I03, must have real evidence. I03 must explicitly record authorization for the online test. Do not upload experimental save data merely to satisfy a checklist. Evidence belongs under `docs/compatibility/evidence/`; remove personal information before including it in a package. Never put save binaries, credentials or game DLLs there.

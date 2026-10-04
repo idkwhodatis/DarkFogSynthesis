@@ -203,7 +203,7 @@ namespace DarkFogSynthesis.Compatibility
             internal void Select(int unused)
             {
                 if (Plugin.Instance == null || !Plugin.Instance.Ready || factory == null || system == null ||
-                    player == null || history == null || !ReferenceEquals(player, GameMain.mainPlayer) ||
+                    GameMain.data == null || player == null || history == null || !ReferenceEquals(player, GameMain.mainPlayer) ||
                     !ReferenceEquals(history, GameMain.history)) return;
                 int recipeId = ProtoIds.DarkFogMatrix.Value;
                 if (!history.RecipeUnlocked(recipeId)) return;
@@ -212,29 +212,32 @@ namespace DarkFogSynthesis.Compatibility
 
                 // Native synchronization can reset other labs. Validate the entire connected
                 // stack before any mutation, and refuse if even one lab needs a refund.
-                if (!TryGetEmptyStack(system, window.labId, out List<int> stack))
-                {
-                    UIRealtimeTip.Popup("Clear every lab in this stack with the native back button first. / 请先用原版返回按钮清空整组研究站。", false);
-                    return;
-                }
-                try
+                var boundary = Plugin.Instance.FailureBoundary;
+                List<int> stack = null!;
+                SessionMutationOutcome outcome = boundary.TryMutate(GameMain.data,
+                    () => TryGetEmptyStack(system, window.labId, out stack), () =>
                 {
                     int root = stack[0];
                     system.labPool[root].SetFunction(false, recipeId, 0, factory.entitySignPool);
                     system.SyncLabFunctions(player, root);
                     system.SyncLabForceAccMode(player, root);
+                }, () =>
+                {
                     foreach (int id in stack)
                     {
                         if (system.labPool[id].recipeId != recipeId || system.labPool[id].researchMode)
                             throw new InvalidOperationException("Native lab synchronization did not select the recipe for the entire stack.");
                     }
-                    button.gameObject.SetActive(false);
-                }
-                catch (Exception ex)
+                });
+                // UI cleanup is outside the native mutation boundary. Its failure cannot turn a
+                // verified native success into an uncertain mutation, or hide an already-set latch.
+                boundary.BestEffort(() =>
                 {
-                    Log.LogError("Native lab selection failed. Inspect this copied-save session before continuing: " + ex);
-                    UIRealtimeTip.Popup("Lab selection failed; inspect the BepInEx log. / 研究站配方选择失败，请查看日志。", false);
-                }
+                    if (outcome == SessionMutationOutcome.Completed) button.gameObject.SetActive(false);
+                    else if (outcome == SessionMutationOutcome.Blocked)
+                        UIRealtimeTip.Popup("Lab selection failed. This session cannot resume or save; load a different validated session. / 研究站选择失败，当前存档已阻止继续与保存，请载入另一个已验证存档。", false);
+                    else UIRealtimeTip.Popup("Clear every lab in this stack with the native back button first. / 请先用原版返回按钮清空整组研究站。", false);
+                });
             }
 
             public void Dispose()

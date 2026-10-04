@@ -6,6 +6,8 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -99,6 +101,31 @@ def candidate_fixture():
             yield root, paths, refs, build, acceptance, acceptance_path, rebuild
 
 
+def candidate_cli(root, paths, acceptance, output_dir, *, cwd):
+    """Run the real CLI parser and packager in a fresh process on text fixtures.
+
+    As in candidate_fixture, only runtime-output discovery is substituted. The
+    subprocess still runs every provenance, acceptance, asset and ZIP guard.
+    Nothing here creates an actual runtime build or target-game test result.
+    """
+    bootstrap = """
+import json
+from pathlib import Path
+import sys
+sys.path.insert(0, sys.argv[1])
+import package
+package.ROOT = Path(sys.argv[2])
+paths = {name: Path(path) for name, path in json.loads(sys.argv[3]).items()}
+package.runtime_paths = lambda configuration: paths
+sys.argv = [package.__file__, *sys.argv[4:]]
+raise SystemExit(package.main())
+"""
+    return subprocess.run([sys.executable, "-c", bootstrap, str(Path(package.__file__).parent),
+                           str(root), json.dumps({name: str(path) for name, path in paths.items()}),
+                           "--channel", "release", "--acceptance", str(acceptance),
+                           "--output-dir", str(output_dir)], cwd=cwd, capture_output=True, text=True)
+
+
 class PackagingGuards(unittest.TestCase):
     def test_manifest_format(self):
         self.assertEqual(package.validate_manifest()["name"], "DarkFogSynthesis")
@@ -153,6 +180,20 @@ class PackagingGuards(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "escapes"):
                     package.project_path(root / "../outside-fixture.txt")
 
+    def test_project_path_rejects_symlinks_before_canonicalizing_dot_segments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "nested").mkdir()
+            (root / "acceptance.json").write_text("harmless fixture")
+            (root / "linked").symlink_to(root / "nested", target_is_directory=True)
+            # resolve() would erase the forbidden linked component from this
+            # otherwise in-project path. Reject it before resolving or reading.
+            with patch.object(package, "ROOT", root), \
+                 patch.object(Path, "resolve", side_effect=AssertionError("Must reject before resolving")), \
+                 patch.object(Path, "read_bytes", side_effect=AssertionError("Must reject before reading")), \
+                 self.assertRaisesRegex(ValueError, "Symlink"):
+                package.validate_release(root / "linked/../acceptance.json")
+
     def test_source_allowlist_excludes_bin_obj_descendants(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -193,6 +234,67 @@ class PackagingGuards(unittest.TestCase):
         with candidate_fixture() as (_, paths, _, _, _, acceptance_path, _):
             self.assertEqual(package.validate_build("Release"), paths)
             package.validate_release(acceptance_path)
+
+    def test_release_cli_accepts_relative_dot_and_absolute_acceptance_paths(self):
+        with candidate_fixture() as (root, paths, _, build, _, acceptance_path, _):
+            expected = acceptance_path.read_bytes()
+            nested = root / "docs/compatibility/cli-acceptance.json"
+            nested.write_bytes(expected)
+            cases = (
+                ("root-relative", root, "acceptance.json"),
+                ("nested-relative", root, "docs/compatibility/cli-acceptance.json"),
+                ("dot-relative", root, "./docs/compatibility/../compatibility/cli-acceptance.json"),
+                ("absolute", root.parent, str(nested)),
+                ("nested-cwd", root / "docs", "compatibility/cli-acceptance.json"),
+            )
+            for name, cwd, argument in cases:
+                with self.subTest(path_form=name):
+                    output = root / "out" / name
+                    result = candidate_cli(root, paths, argument, output, cwd=cwd)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    with zipfile.ZipFile(output / "DarkFogSynthesis-0.1.0-release.zip") as archive:
+                        self.assertIsNone(archive.testzip())
+                        self.assertEqual(archive.read("RELEASE-ACCEPTANCE.json"), expected)
+                        self.assertEqual(archive.read(nested.relative_to(root).as_posix()), expected)
+                        status = json.loads(archive.read("PACKAGE-STATUS.json"))
+                        self.assertEqual(status["buildIdentity"], build["buildIdentity"])
+                        self.assertEqual(status["files"]["RELEASE-ACCEPTANCE.json"],
+                                         package.hashlib.sha256(expected).hexdigest())
+                        recorded = json.loads(archive.read("BUILD-STATUS.json"))
+                        self.assertEqual(recorded["runtimeExecution"], "not_executed")
+                        self.assertFalse(recorded["installedGameValidated"])
+
+    def test_release_cli_still_refuses_checked_in_unverified_acceptance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "out"
+            result = subprocess.run([sys.executable, str(Path(package.__file__).absolute()),
+                                     "--channel", "release", "--acceptance",
+                                     "docs/compatibility/acceptance-status.json", "--output-dir", str(output)],
+                                    cwd=package.ROOT, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("Packaging refused: Release blocked:", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_release_cli_rejects_symlinked_and_outside_acceptance_paths(self):
+        with candidate_fixture() as (root, paths, _, _, _, acceptance_path, _), tempfile.TemporaryDirectory() as tmp:
+            outside = Path(tmp) / "acceptance.json"
+            outside.write_bytes(acceptance_path.read_bytes())
+            (root / "linked-acceptance.json").symlink_to(acceptance_path)
+            (root / "linked-docs").symlink_to(root / "docs", target_is_directory=True)
+            cases = (
+                ("linked-file", "linked-acceptance.json", "Symlink"),
+                ("linked-ancestor", "linked-docs/../acceptance.json", "Symlink"),
+                ("outside-absolute", str(outside), "escapes the project root"),
+                ("outside-relative", os.path.relpath(outside, root), "escapes the project root"),
+            )
+            for name, argument, refusal in cases:
+                with self.subTest(path_form=name):
+                    output = root / "out" / name
+                    result = candidate_cli(root, paths, argument, output, cwd=root)
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn(refusal, result.stderr)
+                    self.assertFalse(output.exists())
 
     def test_release_rejects_missing_and_partial_tested_build(self):
         with candidate_fixture() as (_, _, _, _, acceptance, acceptance_path, _):

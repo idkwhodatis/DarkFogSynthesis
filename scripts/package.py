@@ -46,11 +46,15 @@ def reject_symlink_components(path: Path) -> None:
 def project_path(path: Path, *, file: bool = True) -> Path:
     reject_symlink_components(ROOT)
     reject_symlink_components(path)
-    if not path.resolve().is_relative_to(ROOT.resolve()):
+    # Keep lexical components until the symlink checks finish, then use one
+    # absolute spelling for containment and frozen-snapshot lookups. CLI paths
+    # are relative to the caller's working directory, not necessarily ROOT.
+    resolved = path.resolve()
+    if not resolved.is_relative_to(ROOT.resolve()):
         raise ValueError(f"Package/build input escapes the project root: {path}")
-    if file and not path.is_file():
+    if file and not resolved.is_file():
         raise ValueError(f"Missing or non-file project input: {path}")
-    return path
+    return resolved
 
 
 def tree_files(directory: Path, *, exclude_build: bool = False):
@@ -73,7 +77,7 @@ def source_files() -> dict[str, Path]:
             result[name] = path
     for folder in SOURCE_ROOTS:
         for path in tree_files(ROOT / folder, exclude_build=True):
-            relative = path.relative_to(ROOT)
+            relative = path.relative_to(ROOT.resolve())
             if path.suffix.lower() in SOURCE_EXTENSIONS:
                 result[relative.as_posix()] = path
     return dict(sorted(result.items()))
@@ -276,7 +280,7 @@ def record_build(configuration: str, reference_mode: str) -> None:
     target = project_path(ROOT / "artifacts/build-report.json", file=False)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"Recorded runtime build provenance: {target.relative_to(ROOT)}")
+    print(f"Recorded runtime build provenance: {target.relative_to(ROOT.resolve())}")
 
 
 def validate_reference_mode(report: dict, channel: str | None = None) -> str:
@@ -458,8 +462,8 @@ def package(channel: str, configuration: str, acceptance: Path | None, output_di
     for name, path in sorted(files.items()):
         if path.suffix.lower() in {".dll", ".exe", ".so", ".dylib"} and (channel == "source-only" or path.name not in OWN_DLLS):
             raise ValueError(f"Refusing foreign binary: {name}")
-        project_path(path)
-        relative = path.relative_to(ROOT).as_posix()
+        path = project_path(path)
+        relative = path.relative_to(ROOT.resolve()).as_posix()
         contents[name] = snapshot[relative] if relative in snapshot else path.read_bytes()
     hashes = {name: hashlib.sha256(content).hexdigest() for name, content in contents.items()}
     package_fingerprint = candidate["sourceFingerprint"] if candidate else source_fingerprint_from_bytes(snapshot)

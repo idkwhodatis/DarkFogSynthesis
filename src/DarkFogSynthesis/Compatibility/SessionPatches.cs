@@ -131,7 +131,6 @@ namespace DarkFogSynthesis.Compatibility
             }
             if (__exception != null)
             {
-                if (GameMain.data != null && GameMain.isRunning) GameMain.Pause();
                 Plugin.Instance.AbortSession(GameMain.data, __exception);
             }
             return __exception;
@@ -157,10 +156,7 @@ namespace DarkFogSynthesis.Compatibility
                 if (ReferenceEquals(transition, data)) transition = null;
                 if (error != null && ReferenceEquals(session, data))
                 {
-                    Plugin.Instance.AbortSession(data, error);
-                    Plugin.Instance.EndSession(data);
-                    session = null;
-                    sessionPeaceMode = null;
+                    Plugin.Instance.AbortSession(data, error, () => ClearSession(data));
                 }
             }
         }
@@ -171,8 +167,17 @@ namespace DarkFogSynthesis.Compatibility
             {
                 // A menu preview or old GameData can be destroyed after another save was prepared.
                 if (!ReferenceEquals(session, data)) return;
-                Plugin.Instance.Progression.Restore();
-                Plugin.Instance.EndSession(data);
+                try { Plugin.Instance.Progression.Restore(); }
+                catch (Exception error) { Plugin.Instance.RejectSession(data, error); throw; }
+                finally { ClearSession(data); }
+            }
+        }
+
+        private static void ClearSession(GameData data)
+        {
+            try { Plugin.Instance.EndSession(data); }
+            finally
+            {
                 session = null;
                 sessionPeaceMode = null;
                 if (ReferenceEquals(transition, data)) transition = null;

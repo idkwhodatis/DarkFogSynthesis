@@ -30,6 +30,11 @@ namespace DarkFogSynthesis
         // No runtime/content constructors run before the localization-independent critical barriers.
         private ContentRegistry registry = null!;
         private readonly SessionCompatibilityState compatibility = new SessionCompatibilityState();
+        private SessionFailureBoundary? failureBoundary;
+        internal SessionFailureBoundary FailureBoundary => failureBoundary ??= new SessionFailureBoundary(
+            compatibility, () => { if (GameMain.data != null && GameMain.isRunning) GameMain.Pause(); },
+            reason => { status = "BLOCKED: " + reason; confirmRemoval = false; showDiagnostics = true; },
+            error => Logger.LogError(error));
         internal RuntimeProgression Progression { get; private set; } = null!;
         internal bool Ready => registry?.Ready == true && StartupGuardEntrypoints.State.AllowsGameOperations && !compatibility.IsBlocked && !SafeRemovalService.IsQuarantined;
         internal bool IsCompatibilityBlocked => compatibility.IsBlocked;
@@ -145,15 +150,12 @@ namespace DarkFogSynthesis
 
         internal void RejectSession(GameData? data, Exception error)
         {
-            BlockSession(data, error.Message);
-            Logger.LogError(error);
+            FailureBoundary.Reject(data, error);
         }
 
-        internal void AbortSession(GameData? data, Exception error)
+        internal void AbortSession(GameData? data, Exception error, Action? cleanup = null)
         {
-            RejectSession(data, error);
-            try { Progression.Restore(); }
-            catch (Exception restoreError) { Logger.LogError(restoreError); }
+            FailureBoundary.Abort(data, error, () => Progression?.Restore(), cleanup ?? (() => { }));
         }
 
         internal bool DiagnoseLateConflicts()
@@ -171,18 +173,13 @@ namespace DarkFogSynthesis
                 BlockSession(GameMain.data, "CONFLICT: another mod disabled required technologies: " + string.Join(", ", unavailable) +
                     ". Review that mod's combat-technology settings, then restart. No technologies or other mod settings were changed. / 前置科技被其他 Mod 禁用，请检查配置并重启。");
             }
-            catch (Exception error) { BlockSession(GameMain.data, error.Message); }
+            catch (Exception error) { RejectSession(GameMain.data, error); }
             return false;
         }
 
         private void BlockSession(GameData? data, string reason)
         {
-            compatibility.BlockSession(data, reason);
-            status = "BLOCKED: " + reason;
-            confirmRemoval = false;
-            showDiagnostics = true;
-            Logger.LogError(status);
-            if (GameMain.data != null && GameMain.isRunning) GameMain.Pause();
+            RejectSession(data, new InvalidOperationException(reason));
         }
 
         private void Fail(Exception error)
