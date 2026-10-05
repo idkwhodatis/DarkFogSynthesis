@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "classification": "source-and-reference-assembly-smoke-only",
+  "baselineCommit": "25988c65d5bc8ef9aa36b6c7441ce0a887307eff",
+  "codeCommit": "535f08c8bfc6b6a66f9ae2aa45d4506f4b4d096f",
+  "sourceWorkflowRun": 37334699690,
+  "sourceJobs": {
+    "pureTests": {"job": 111846403107, "status": "success", "includes": "Core, real Harmony managed fixtures, resource-audit self-tests, diagnostic fixtures, packaging and genuine Core compiler-capture regression"},
+    "windowsCheckoutAndCapture": {"job": 111846402659, "status": "success"},
+    "linuxCheckout": {"job": 111846403192, "status": "success"}
+  },
+  "referenceWorkflowRun": 37334699408,
+  "referenceWorkflowJob": 111846400451,
+  "referenceWorkflowStatus": "success",
+  "referenceChecks": {
+    "pluginAndCore": {"warnings": 0, "errors": 0},
+    "exactUnityFixture": {"warnings": 0, "errors": 0, "declaredCases": 20, "engineExecution": "not_executed"},
+    "uiChecker": {"passed": 20},
+    "snapshotChecker": {"passed": 26},
+    "projectGenerator": {"passed": 5},
+    "bilingualResources": "main-assembly dictionaries match approved bytes; no satellite requirement",
+    "publicApiAudit": {"directGameMemberSites": 976, "uniqueGameMembers": 198, "gameTypes": 48, "nonpublicAccesses": 0, "unresolvedReferences": 0}
+  },
+  "pluginSha256": "7028ae9889d2e9065d0fe917bf17e1d0d6ef800da1d6b5b2b5ec15630ca13aaa",
+  "gameReferenceSha256": "3c6d3211a948a528af1d4f813bffa5cc2d3bdddfacbc1a49dd7a29bb3b9deec9",
+  "auditArtifact": {"id": 11355547666, "sha256": "dd0ac926c8bf8b5c8768781e406acddf7f63b988163e4c758a4be8150f27abbc"},
+  "localChecks": {
+    "uiChecker": 20,
+    "snapshotChecker": 26,
+    "projectGenerator": 5,
+    "assetsAndContent": "passed",
+    "packaging": "attempt exceeded local execution limit; full passing result is from the source CI job, not local completion",
+    "csharpExecution": "not_executed_locally"
+  },
+  "captureCompatibility": "Outer snapshot schema remains 3. Nested uiLayout is now schema 3 with native-graphic-sorting-boundaries; schema-1/2 UI frames must be recaptured.",
+  "runtimeExecution": "not_executed",
+  "gameAcceptanceCases": {"total": 35, "executed": 0},
+  "releaseEligible": false,
+  "notice": "Historical verification only, not release acceptance or current build provenance. The temporary reference workflow was read-only and is removed with this record. It reused the pinned historical reference-build script to compile the current full plugin and unchanged copied Unity fixture. No Unity/DSP engine, actual masking/rendering, native game saves, research or production was executed. The 20 declared Unity cases are reference-compiled, NOT passed engine tests. Diagnostic association requires an active attached MaskableGraphic; unobservable rectangles produce an incomplete diagnostic only. No recipes, stable IDs, costs, save formats, session guards or single-player/multiplayer policies changed. Final documentation/workflow-cleanup CI is separate evidence. No binaries, credentials, saves or private compiler-input paths are distributed here."
+}
