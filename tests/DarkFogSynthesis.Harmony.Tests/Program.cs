@@ -58,7 +58,11 @@ namespace DarkFogSynthesis.Harmony.Tests
                 Run("foreign Resume prefixes cannot redirect failed-preflight restoration", FailedPreflightResumeReplacement);
                 Run("candidate-save history mutation rejects success while retaining quarantine", CandidateSaveHistoryMutation);
                 Run("unchanged candidate-save history passes both preservation checks", CandidateSaveHistoryPreserved);
-                Console.WriteLine("PASS: " + assertions + " assertions across 24 real Harmony pipeline cases");
+                Run("absent and inactive Nebula preserve native single-player lifecycle", MultiplayerInactive);
+                Run("active multiplayer rejects Begin without permanent startup failure", MultiplayerEntry);
+                Run("late multiplayer activation closes saves and mutations; fresh SP recovers", MultiplayerTransition);
+                Run("multiplayer activated in Begin callbacks cannot complete validation", MultiplayerLateBegin);
+                Console.WriteLine("PASS: " + assertions + " assertions across 28 real Harmony pipeline cases");
                 Console.WriteLine("Boundary: no game integration, actual disk saves, cleanup, or uninstall tested.");
                 return 0;
             }
@@ -143,6 +147,7 @@ namespace DarkFogSynthesis.Harmony.Tests
         private static void BeforeBegin(out object? __state)
         {
             __state = null;
+            current.Multiplayer.EnsureSinglePlayer();
             __state = current.State.BeginValidation(current.Identity);
             if (current.FailurePoint == "prefix") throw current.Failure;
         }
@@ -159,6 +164,7 @@ namespace DarkFogSynthesis.Harmony.Tests
             TryNestedBegin("postfix");
             if (current.ExerciseCallbackSaves) AttemptAllSaves();
             if (current.FailurePoint == "postfix") throw current.Failure;
+            if (current.ActivateMultiplayerInPostfix) current.MultiplayerActive = true;
         }
 
         private static Exception? FinishBegin(object? __state, bool __runOriginal, Exception? __exception)
@@ -172,6 +178,7 @@ namespace DarkFogSynthesis.Harmony.Tests
             {
                 return SessionBeginCompletion.Finish(__runOriginal, __exception,
                     () => {
+                        current.Multiplayer.EnsureSinglePlayer();
                         current.ValidationCalls++;
                         if (current.AcceptLateValidation) return true;
                         current.State.BlockSession(current.Identity, "Harmless late validation rejection");
@@ -233,7 +240,7 @@ namespace DarkFogSynthesis.Harmony.Tests
         {
             lock (current.SaveGate)
             {
-                if (!MaintenanceSessionGuard.AllowsResume(current.StartupReady && !current.State.IsBlocked,
+                if (!MaintenanceSessionGuard.AllowsResume(current.StartupReady && !current.State.IsBlocked && current.Multiplayer.AllowsSinglePlayer,
                     current.Cleaning, current.QuarantinedIdentity != null)) return false;
                 return restoringPreflightSession == null || restoringPreflightSession.CanRestoreRunningSession(current.Identity,
                     current.History, current.Player, current.Loading, current.StartupReady && current.State.CanPersist(current.Identity));
@@ -268,7 +275,7 @@ namespace DarkFogSynthesis.Harmony.Tests
             state = false;
             current.SaveAttempts++;
             bool allowed = SessionPersistencePolicy.AllowsWrite(
-                current.StartupReady && current.State.CanPersist(current.Identity),
+                current.StartupReady && current.State.CanPersist(current.Identity) && current.Multiplayer.AllowsSinglePlayer,
                 current.Cleaning || current.QuarantinedIdentity != null, isNamed,
                 requestedName, current.PermittedName);
             if (!allowed) { result = false; current.RefusedSaves++; return false; }
@@ -771,8 +778,93 @@ namespace DarkFogSynthesis.Harmony.Tests
             }
         }
 
+        // Reflection binds a real public static getter, without loading Nebula or DSP.
+        public static class MultiplayerFixture
+        {
+            public static bool IsActive => current.MultiplayerActive;
+        }
+
+        private static void MultiplayerInactive()
+        {
+            foreach (bool installed in new[] { false, true })
+            {
+                NewContext(); current.NebulaInstalled = installed;
+                current.ExerciseBeginResume = true;
+                current.ExerciseCallbackSaves = true;
+                HarmlessBegin();
+                Check(current.NativeBeginCalls == 1 && current.NativeResumeCalls == 1 && current.CompletionCalls == 1,
+                    "Single-player Begin/Resume changed with optional Nebula presence");
+                Check(current.RefusedSaves == 12 && !current.State.IsBlocked && current.StartupReady,
+                    "Inactive Nebula changed pending-save protection or startup state");
+                Check(HarmlessNamedSave("sp") && HarmlessAutoSave() && HarmlessLastExitSave() && HarmlessErrorAutoSave(),
+                    "Single-player save entrypoints regressed");
+                Check(current.NativeSaveCalls == 4 && current.WritesInProgress == 0,
+                    "Single-player native save accounting changed");
+            }
+        }
+
+        private static void MultiplayerEntry()
+        {
+            NewContext(); current.NebulaInstalled = true; current.MultiplayerActive = true;
+            Check(CaptureBegin() is InvalidOperationException, "Active MP must refuse native entry");
+            Check(current.NativeBeginCalls == 0 && current.CompletionCalls == 0 && current.State.IsBlocked && current.StartupReady,
+                "MP entry must block only the session, not poison startup or run the native body");
+            AttemptAllSaves(); HarmlessResume();
+            Check(current.NativeResumeCalls == 0, "Active MP resumed through the single-player guard");
+            RecoverSinglePlayer();
+        }
+
+        private static void MultiplayerTransition()
+        {
+            NewContext(); current.NebulaInstalled = true; HarmlessBegin();
+            current.MultiplayerActive = true;
+            // Prove saves and Resume close immediately, even before the frame-level session latch.
+            Check(!current.State.IsBlocked, "Fixture unexpectedly latched before activity was inspected");
+            AttemptAllSaves(); HarmlessResume();
+            Check(current.NativeSaveCalls == 0 && current.NativeResumeCalls == 0, "Late activity escaped entry guards");
+            int mutations = 0;
+            var boundary = new SessionFailureBoundary(current.State, () => current.Paused = true, _ => { }, _ => { });
+            var result = boundary.TryMutate(current.Identity, () => true,
+                () => { current.Multiplayer.EnsureSinglePlayer(); mutations++; }, current.Multiplayer.EnsureSinglePlayer);
+            Check(result == SessionMutationOutcome.Blocked && mutations == 0 && current.State.IsBlocked && current.Paused,
+                "Late activity reached a native custom mutation or did not retain containment");
+            RecoverSinglePlayer();
+        }
+
+        private static void MultiplayerLateBegin()
+        {
+            NewContext(); current.NebulaInstalled = true; current.ActivateMultiplayerInPostfix = true;
+            Check(CaptureBegin() is InvalidOperationException && current.NativeBeginCalls == 1 && current.CompletionCalls == 0,
+                "Late MP activation was promoted by the finalizer");
+            Check(current.State.IsBlocked && current.StartupReady, "Late MP activation should retain only the session failure");
+            current.ActivateMultiplayerInPostfix = false;
+            RecoverSinglePlayer();
+        }
+
+        private static void RecoverSinglePlayer()
+        {
+            object affected = current.Identity;
+            current.MultiplayerActive = false;
+            Check(!current.State.CanPersist(affected), "Leaving MP must not reuse affected validation");
+            current.State.EndSession(affected);
+            current.Identity = new object();
+            current.State.BeginSession(current.Identity);
+            HarmlessBegin();
+            Check(!current.State.IsBlocked && current.State.CanPersist(current.Identity) && current.StartupReady,
+                "Fresh single-player recovery incorrectly requires removing Nebula or restarting");
+            HarmlessResume();
+            Check(HarmlessNamedSave("fresh-sp") && current.WritesInProgress == 0 && !current.Paused,
+                "Fresh SP cannot resume/save after a rejected multiplayer session");
+        }
+
         private sealed class Context
         {
+            internal bool NebulaInstalled, MultiplayerActive, ActivateMultiplayerInPostfix;
+            internal readonly MultiplayerSessionProbe Multiplayer;
+            internal Context()
+            {
+                Multiplayer = new MultiplayerSessionProbe(() => NebulaInstalled, () => typeof(MultiplayerFixture));
+            }
             internal readonly SessionCompatibilityState State = new SessionCompatibilityState();
             internal readonly Exception Failure = new InvalidOperationException("Harmless injected failure");
             internal object Identity = new object();

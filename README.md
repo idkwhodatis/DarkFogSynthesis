@@ -89,6 +89,18 @@ Peace Mode always adds the four agreed combat prerequisites to the four vanilla 
 
 `TraceSnapshots` opts into the new labelled lifecycle exports; it defaults off. To observe rendered UI, use **Capture UI in 3 seconds / 3 秒后采集 UI 边界** in the diagnostics window, then return the pointer to the node. These read-only observations are not game acceptance. See [adaptation implementation](docs/compatibility/content-adaptation.md), the [target-game runbook](docs/compatibility/target-game-adaptation-runbook.md) and [CI/reference-only evidence](docs/compatibility/adaptation-ci-verification.json).
 
+## Multiplayer compatibility / 联机兼容性
+
+Active Nebula multiplayer sessions are not supported: the custom laboratory recipe
+selector is not network-synchronized. **Single-player still works with Nebula installed
+but inactive**; an API-only installation is also not blocked. Leave multiplayer and
+load a fresh single-player session after a refusal. An unreadable installed Nebula
+state is reported as unknown rather than silently accepted. No networking or save
+format is changed. See [guard behavior and test scope](docs/compatibility/nebula-session-guard.md).
+
+仅阻止已激活的 Nebula 联机会话；安装 Nebula 但未联机的单人模式不受此限制。
+退出联机后请重新载入单人存档，勿继续或保存已被阻止的会话。此检查不代表支持联机同步。
+
 ## Verification and removal / 验收与卸载
 
 [Existing-mod source comparison](docs/compatibility/mod-source-comparison.md) · [Review regressions](docs/compatibility/review-regressions.md) · [Startup/progression/package follow-up](docs/compatibility/startup-progress-packaging-review.md) · [Session completion and evidence review](docs/compatibility/session-completion-evidence-review.md) · [Bounded performance review](docs/compatibility/performance-review.md) · [Acceptance matrix](docs/acceptance.md) · [current machine-readable status](docs/compatibility/acceptance-status.json) · [uninstall limits](docs/uninstall.md) · [changelog](docs/CHANGELOG.md)

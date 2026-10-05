@@ -22,6 +22,7 @@ namespace DarkFogSynthesis
     [BepInPlugin(Guid, "Dark Fog Synthesis", Version)]
     [BepInDependency("me.xiaoye97.plugin.Dyson.LDBTool", "3.0.3")]
     [BepInDependency(CommonAPIPlugin.GUID, "1.6.7")]
+    [BepInDependency(MultiplayerSessionProbe.NebulaPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
     [CommonAPISubmoduleDependency(nameof(ProtoRegistry), nameof(TabSystem))]
     public sealed class Plugin : BaseUnityPlugin
     {
@@ -39,10 +40,10 @@ namespace DarkFogSynthesis
         internal RuntimeProgression Progression { get; private set; } = null!;
         internal bool Ready => registry?.Ready == true && !IsPersistenceBlocked && !SafeRemovalService.IsQuarantined;
         internal bool IsCompatibilityBlocked => compatibility.IsBlocked;
-        internal bool IsPersistenceBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || !compatibility.CanPersist(GameMain.data);
+        internal bool IsPersistenceBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || !compatibility.CanPersist(GameMain.data) || !MultiplayerCompatibilityGuard.AllowsSinglePlayer;
         // Preserve native Begin's existing resume behavior; persistence has a stricter identity gate.
-        internal bool IsResumeBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || compatibility.IsBlocked;
-        private string? BlockingReason => fatal ?? compatibility.BlockReason;
+        internal bool IsResumeBlocked => !StartupGuardEntrypoints.State.AllowsGameOperations || compatibility.IsBlocked || !MultiplayerCompatibilityGuard.AllowsSinglePlayer;
+        private string? BlockingReason => fatal ?? compatibility.BlockReason ?? MultiplayerCompatibilityGuard.BlockingReason;
         private Harmony harmony = null!;
         private ConfigEntry<bool>? nonPeaceSetting;
         private bool nonPeaceAtStartup;
@@ -126,6 +127,8 @@ namespace DarkFogSynthesis
         // Preparing a replacement must remain possible while the old session's block is latched.
         internal void EnsureRegistryReady()
         {
+            // Session admission only: registration and offline SP never depend on Nebula being absent.
+            MultiplayerCompatibilityGuard.EnsureSinglePlayer();
             StartupGuardEntrypoints.State.EnsureGameOperationsAllowed();
             StartupGuardInstaller.Verify();
             if (registry?.Ready != true) throw new InvalidOperationException("DarkFogSynthesis cannot safely enter this save: prototype initialization did not finish");
@@ -233,6 +236,14 @@ namespace DarkFogSynthesis
         // hovered/expanded node. No enumeration, hashing or I/O occurs without that request.
         private void LateUpdate()
         {
+            // Hosting can activate multiplayer on an already loaded SP world without another
+            // native Begin. Latch only that actual session; fresh SP validation can clear it.
+            // Without Nebula this is an O(1) registry lookup, not per-frame type discovery.
+            if (GameMain.data != null && StartupGuardEntrypoints.State.AllowsGameOperations && !compatibility.IsBlocked)
+            {
+                string? multiplayerReason = MultiplayerCompatibilityGuard.BlockingReason;
+                if (multiplayerReason != null) BlockSession(GameMain.data, multiplayerReason);
+            }
             if (uiCaptureAt < 0f || UnityEngine.Time.realtimeSinceStartup < uiCaptureAt) return;
             uiCaptureAt = -1f;
             try { status = "UI observation saved: " + CompatibilityReport.Export(registry?.Ready == true, Ready,

@@ -39,6 +39,8 @@ namespace DarkFogSynthesis.Core.Tests
                     () => RecipeExecutionContractTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("C01 unsupported lab replacements are rejected by exact source-backed identity",
                     () => LabRuntimeCompatibilityPolicyTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
+                ("C01 optional multiplayer guard preserves inactive single-player and rechecks active sessions",
+                    () => MultiplayerSessionProbeTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("U03 native shared buffer identity is checked before snapshots",
                     () => RefundBufferAliasGuardTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("C01 diagnostic failures and session compatibility latches have separate lifecycles",

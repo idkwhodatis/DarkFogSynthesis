@@ -221,14 +221,20 @@ namespace DarkFogSynthesis.Compatibility
                 var boundary = Plugin.Instance.FailureBoundary;
                 List<int> stack = null!;
                 SessionMutationOutcome outcome = boundary.TryMutate(GameMain.data,
-                    () => TryGetEmptyStack(system, window.labId, out stack), () =>
+                    () => {
+                        MultiplayerCompatibilityGuard.EnsureSinglePlayer();
+                        return TryGetEmptyStack(system, window.labId, out stack);
+                    }, () =>
                 {
+                    // Re-read live activity at the mutation boundary, not only at session entry.
+                    MultiplayerCompatibilityGuard.EnsureSinglePlayer();
                     int root = stack[0];
                     system.labPool[root].SetFunction(false, recipeId, 0, factory.entitySignPool);
                     system.SyncLabFunctions(player, root);
                     system.SyncLabForceAccMode(player, root);
                 }, () =>
                 {
+                    MultiplayerCompatibilityGuard.EnsureSinglePlayer();
                     foreach (int id in stack)
                     {
                         if (system.labPool[id].recipeId != recipeId || system.labPool[id].researchMode)
