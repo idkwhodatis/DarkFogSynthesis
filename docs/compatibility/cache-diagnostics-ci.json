@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "classification": "source-and-reference-assembly-smoke-only",
+  "baselineCommit": "cb24eed2147b107b50fc654f7c596891a3860194",
+  "codeCommit": "426230f7d1db5d1f80436a4ffa5830441613fa66",
+  "integrationWorkflowRun": 37260764898,
+  "integrationWorkflowJob": 111607306546,
+  "integrationWorkflowStatus": "success",
+  "executionOrder": "Applied the exact reviewed patch and explicit null-guard correction on staging commit 0e98d4f2c93083bfb46514d04961f850224793a7, ran all listed tests and reference builds/audits, then committed the tested code and removed all three temporary integration files. The returned source archive was checked against all 14 locally reviewed final files; no uncommitted diff remained.",
+  "checks": {
+    "pureCore": {"passed": 80, "assertions": 18754},
+    "harmlessHarmonyFixtures": {"passed": 22, "assertions": 333},
+    "packagingFixtures": {"passed": 64},
+    "compilerCapture": {"assertions": 56, "host": "Linux"},
+    "checkoutAssets": {"passed": 3, "host": "Linux"},
+    "runtimeSnapshotFixtures": {"passed": 19},
+    "uiGeometryAndTextFixtures": {"passed": 17},
+    "resourceAuditSelfTests": {"passed": 15},
+    "referencePluginBuild": {"warnings": 0, "errors": 0},
+    "optionalUnityFixtureReferenceBuild": {"warnings": 0, "errors": 0, "engineExecution": "not_executed", "scope": "Compiled the exact production RectMaskClipCapture helper and NUnit fixture against pinned Unity references; no Unity native API was executed."},
+    "bilingualResources": {"keysPerDictionary": 31, "satelliteFree": true},
+    "publicApiAudit": {"directGameMemberSites": 929, "uniqueGameMembers": 195, "gameTypes": 48, "nonpublicAccesses": 0, "unresolvedReferences": 0}
+  },
+  "buildIdentity": "cf2d2b395815cfcc72e098b81bd1533d563f041c0a4d10f56cdcfe2d4c9e5672",
+  "assemblies": {
+    "DarkFogSynthesis.dll": "c71a5efd4f21fc088c9b083f02a269ff2308d9e09a84cbad132aabec8edd5f41",
+    "DarkFogSynthesis.Core.dll": "f889bdd43f6fa35baf9f75d9015b70a830d6acd83af0636522c03ea38e886672"
+  },
+  "gameReferenceSha256": "3c6d3211a948a528af1d4f813bffa5cc2d3bdddfacbc1a49dd7a29bb3b9deec9",
+  "initialFailedRun": {"run": 37260421576, "reason": "CS8602 in retained-cache native adapter; replaced the opaque Require null assertion with an explicit null-coalescing throw and reran the entire workflow. No warnings or tests were disabled."},
+  "runtimeExecution": "not_executed",
+  "gameAcceptanceCases": {"total": 35, "executed": 0},
+  "releaseEligible": false,
+  "notice": "Historical verification record only, not the packager's current build report or release acceptance. A final read-only CI run on the documentation commit is separate evidence. Private reference paths were temporary; no game/Unity binaries, saves or compiler-input paths are distributed. Game research, production, UI rendering, cleanup and save behavior were not executed. Existing UI-schema-1 observations must be recaptured using UI schema 2 with native padded-mask semantics. Recipes, fixed IDs, costs, discovery rules and existing acceptance statuses are unchanged."
+}
