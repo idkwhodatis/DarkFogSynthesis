@@ -1,8 +1,8 @@
 # Dark Fog Synthesis / 黑雾材料合成
 
-**Experimental implementation, not a validated release. No target-game tests have been executed.** This repository implements the frozen [V1 plan](DarkFogSynthesis_Implementation_Plan_ZH.md). It does not yet establish safe save migration/removal, machine compatibility, achievements, Metadata, or Milky Way eligibility. Use an isolated mod profile and disposable copies of saves. Keep the untouched original backup.
+**Experimental implementation, not a validated release. No target-game tests have been executed.** This repository implements the frozen [V1 plan](DarkFogSynthesis_Implementation_Plan_ZH.md), with the explicitly approved Silicon Neuron ingredient revision described below. It does not yet establish safe save migration/removal, machine compatibility, achievements, Metadata, or Milky Way eligibility. Use an isolated mod profile and disposable copies of saves. Keep the untouched original backup.
 
-**实验实现，尚未通过游戏验收，不是正式可用版本。** 本仓库遵循已冻结的 V1 计划。未在目标游戏中验证生产设备、存档迁移/安全卸载、成就、Metadata 或银河资格。只用于独立 Mod 配置档和可丢弃的存档副本，保留未修改的原始备份。
+**实验实现，尚未通过游戏验收，不是正式可用版本。** 本仓库遵循 V1 计划及已批准的硅基神经元原料修改。未在目标游戏中验证生产设备、存档迁移/安全卸载、成就、Metadata 或银河资格。只用于独立 Mod 配置档和可丢弃的存档副本，保留未修改的原始备份。
 
 ## Scope / 范围
 
@@ -12,7 +12,7 @@ Two technologies and six recipes produce existing vanilla Dark Fog materials. No
 
 - Energy Shard: 1 combustible unit + 1 energetic graphite + 1 glass → 2 shards / 2 s, smelter
 - Dark Fog Matrix: 2 crystalline silicon + 1 photon combiner + 1 plasma exciter + 1 titanium glass → 1 matrix / 4 s, matrix lab
-- Silicon-based Neuron: 2 microcrystalline components + 1 particle broadband + 2 crystalline silicon → 1 / 4 s, assembler
+- Silicon-based Neuron: 2 microcrystalline components + 2 titanium alloy + 2 crystalline silicon → 1 / 4 s, assembler
 - Matter Recombinator: 1 plane filter + 2 super-magnetic rings + 2 hydrogen + 2 crystalline silicon → 1 / 6 s, assembler
 - Negentropy Singularity: 1 strange matter + 2 Casimir crystals + 1 deuteron fuel rod + 2 crystalline silicon → 1 / 8 s, assembler
 - Core Element: 2 antimatter + 2 frame materials + 2 super-magnetic rings + 4 crystalline silicon → 1 / 10 s, assembler
@@ -30,6 +30,9 @@ Prerequisites: .NET 8 SDK, Python 3.9+ with Pillow, and PowerShell 7 for the `.p
 python scripts/generate-assets.py --check
 python scripts/validate-content.py
 dotnet run --project tests/DarkFogSynthesis.Core.Tests -c Release
+# Adaptation diagnostics fixtures, not target-game observations
+python scripts/test-runtime-snapshots.py
+python scripts/test-ui-layout.py
 # Additional isolated build-tooling regressions (Git needed for checkout test)
 python scripts/test-checkout-assets.py
 python scripts/test-build-capture.py
@@ -52,7 +55,7 @@ Copy-Item Local.Build.props.example Local.Build.props
 ./scripts/Package.ps1 -Channel experimental
 ```
 
-The build fails visibly when game/dependency references are absent. It never downloads game DLLs, copies dependencies into the package, or installs into your game. `Release` compiler optimization is not release acceptance. See [build and package details](docs/build.md).
+The normal build fails visibly when game/dependency references are absent. It does not download game DLLs, copy dependencies into the package, or install into your game. `Release` compiler optimization is not release acceptance. See [build and package details](docs/build.md). The one-off adaptation reference compilation is documented separately and is not a substitute for this installed-reference workflow.
 
 若缺少合法游戏引用，只能生成源码包，不能伪造可安装版本：
 
@@ -77,9 +80,14 @@ Critical load/save/session guards are installed and verified before configuratio
 ```ini
 [Progression]
 ApplyCombatPrerequisitesInNonPeaceMode = false
+
+[Diagnostics]
+TraceSnapshots = false
 ```
 
 Peace Mode always adds the four agreed combat prerequisites to the four vanilla hidden technologies. `true` extends those requirements to non-Peace saves; `false` preserves the ordinary non-Peace prerequisites. Recipes and the two new technologies exist in both modes. Restart after changes. 原版隐藏科技的发现条件、已有研究进度及普通科技的材料配方解锁必须保留；此项不是 Mod 总开关。
+
+`TraceSnapshots` opts into the new labelled lifecycle exports; it defaults off. To observe rendered UI, use **Capture UI in 3 seconds / 3 秒后采集 UI 边界** in the diagnostics window, then return the pointer to the node. These read-only observations are not game acceptance. See [adaptation implementation](docs/compatibility/content-adaptation.md), the [target-game runbook](docs/compatibility/target-game-adaptation-runbook.md) and [CI/reference-only evidence](docs/compatibility/adaptation-ci-verification.json).
 
 ## Verification and removal / 验收与卸载
 

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "documentType": "manual-observation-worksheet-not-release-acceptance",
+  "execution": "not_executed",
+  "caseId": null,
+  "runId": null,
+  "testedBuildIdentity": null,
+  "profileClass": null,
+  "gameVersion": null,
+  "language": null,
+  "uiScale": null,
+  "viewport": null,
+  "machine": {
+    "kind": null,
+    "tier": null,
+    "baseSpeed": null,
+    "recipeId": null,
+    "sprayMode": null
+  },
+  "actions": [],
+  "before": {
+    "recipeUnlocked": null,
+    "nativeItemUnlocked": null,
+    "recordedSpecialDiscovery": null,
+    "researchProgress": null,
+    "inventory": [],
+    "machineBuffers": []
+  },
+  "after": {
+    "recipeUnlocked": null,
+    "nativeItemUnlocked": null,
+    "recordedSpecialDiscovery": null,
+    "researchProgress": null,
+    "inventory": [],
+    "machineBuffers": []
+  },
+  "observedResult": null,
+  "evidence": [],
+  "limitations": [],
+  "notice": "Populate only from actual game observations. Use total proliferation points and item IDs/counts in inventory rows. Do not include save names, account details, credentials or private installation paths. This worksheet cannot approve a release."
+}

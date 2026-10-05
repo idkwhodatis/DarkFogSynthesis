@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "classification": "source-and-reference-assembly-smoke-only",
+  "runtimeExecution": "not_executed",
+  "codeCommit": "8aeb354826c1996db230a011e9473cee329116d0",
+  "integrationWorkflowRun": 37257443986,
+  "integrationWorkflowJob": 111597445142,
+  "integrationWorkflowStatus": "success",
+  "executionOrder": "Applied bounded source changes, ran tests and reference compilation/audits, then committed the tested changes. This run began at staging commit 6a06d775fedc47ebcbf07bcbfd1e72ba5a4777b0.",
+  "checks": {
+    "pureCore": {"passed": 79, "assertions": 18384},
+    "harmlessHarmonyFixtures": {"passed": 22, "assertions": 333},
+    "packagingFixtures": {"passed": 64},
+    "compilerCapture": {"assertions": 56, "host": "Linux"},
+    "checkoutAssets": {"passed": 3, "host": "Linux"},
+    "runtimeSnapshotFixtures": {"passed": 14},
+    "uiGeometryAndTextFixtures": {"passed": 13},
+    "resourceAuditSelfTests": {"passed": 15},
+    "referencePluginBuild": {"warnings": 0, "errors": 0},
+    "bilingualResources": {"keysPerDictionary": 31, "satelliteFree": true},
+    "publicApiAudit": {"directGameMemberSites": 924, "uniqueGameMembers": 195, "gameTypes": 48, "nonpublicAccesses": 0, "unresolvedReferences": 0}
+  },
+  "buildIdentity": "bf4ad165d08ddc4045f7c549c221dcc85abdefbd56461a29942e0d4ca75cb31d",
+  "assemblies": {
+    "DarkFogSynthesis.dll": "8ff32564cdd771ef7109beb01b8e82bb327bb8609f5c9cdc337624da00459dcb",
+    "DarkFogSynthesis.Core.dll": "aab66b2bd72d20ecf2b4bedf3fa251af657180b8ee93e0ac3afc94a6595afb6a"
+  },
+  "gameReferenceSha256": "3c6d3211a948a528af1d4f813bffa5cc2d3bdddfacbc1a49dd7a29bb3b9deec9",
+  "gameAcceptanceCases": {"total": 35, "executed": 0},
+  "releaseEligible": false,
+  "notice": "Historical source/reference-only observation, not the packager's current build report or release acceptance. Temporary reference paths were removed after verification; reproduce locally with lawful installed references before testing or packaging a candidate. No DLLs, saves, dependencies or private build-input paths are distributed in this record. Normal read-only CI on the final documentation/cleanup commit is separate evidence."
+}
