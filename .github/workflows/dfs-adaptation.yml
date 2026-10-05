@@ -54,6 +54,8 @@ jobs:
           if test -f scripts/test-ui-layout.py; then python scripts/test-ui-layout.py; fi
           git diff --cached --check
           git diff --check
+      - name: Compile and audit pinned public reference assemblies (no game execution)
+        run: python scripts/dfs-adaptation-smoke.py
       - name: Commit tested changes without overwriting another writer
         env:
           COMMIT_MESSAGE: ${{ steps.change.outputs.message }}
@@ -66,7 +68,7 @@ jobs:
           git commit -m "$COMMIT_MESSAGE"
           git push origin HEAD:master
           echo "Implemented and tested commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-          echo 'Scope: source/Core/Harmony fixtures; no DSP, game saves, online tests, runtime release or deployment.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Scope: source/Core/Harmony fixtures and reference-only compilation; no DSP, game saves, online tests, runtime release or deployment.' >> "$GITHUB_STEP_SUMMARY"
       - name: Retain source and failure diagnostics (no credentials or build inputs)
         if: always()
         run: |
@@ -74,6 +76,9 @@ jobs:
           git archive --format=zip -o /tmp/dfs-adaptation-results/source.zip HEAD
           git diff HEAD --binary > /tmp/dfs-adaptation-results/working-tree.patch
           git log -3 --format='%H %s' > /tmp/dfs-adaptation-results/commits.txt
+          for report in resource-audit.json public-api-audit.json build-report.json; do
+            if test -f artifacts/$report; then cp artifacts/$report /tmp/dfs-adaptation-results/$report; fi
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

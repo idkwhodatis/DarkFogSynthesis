@@ -35,6 +35,10 @@ jobs:
         run: |
           python scripts/generate-assets.py --check
           python scripts/validate-content.py
+      - name: Adaptation diagnostic tooling fixtures
+        run: |
+          python scripts/test-runtime-snapshots.py
+          if test -f scripts/test-ui-layout.py; then python scripts/test-ui-layout.py; fi
       - name: Verify packaging and release-refusal guards
         run: python scripts/test-packaging.py
       - name: Verify real compiler capture rejects uncompiled source additions
