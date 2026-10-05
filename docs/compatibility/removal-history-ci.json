@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "classification": "source-and-reference-assembly-smoke-only",
+  "baselineCommit": "8b43a454e41bb17b6101b6381fbea8770e145f37",
+  "codeCommit": "57a5795be173bb71ab49607eb96e7ade2b8036e3",
+  "verificationWorkflowRun": 37264389718,
+  "verificationWorkflowJob": 111618009041,
+  "verificationStepsStatus": "success",
+  "workflowConclusion": "failure",
+  "publication": "All test, mutation-check, reference-compilation and metadata-audit steps passed. The CI token could not push the changed ci.yml because it lacked workflows permission. The exact tested commit was subsequently fast-forwarded to master through the connected GitHub account, with no force update or source changes. Its source artifact matched all 13 locally reviewed files byte-for-byte and contained no uncommitted diff. All temporary integration files were removed in that commit.",
+  "checks": {
+    "pureCore": {"passed": 81, "assertions": 18826},
+    "harmlessHarmonyFixtures": {"passed": 24, "assertions": 377},
+    "postSaveGuardMutation": {"status": "passed", "suitesRejectingRemovedCheck": 2, "scope": "Temporarily removed the production post-save verification call, confirmed the expected assertion failures in Core and actual Harmony managed fixtures, then restored the original source bytes before reference compilation."},
+    "packagingFixtures": {"passed": 64},
+    "compilerCapture": {"assertions": 56, "host": "Linux"},
+    "checkoutAssets": {"passed": 3, "host": "Linux"},
+    "runtimeSnapshotFixtures": {"passed": 26},
+    "uiGeometryAndTextFixtures": {"passed": 17},
+    "generatedUnityProjectFixtures": {"passed": 5, "editorExecution": "not_executed"},
+    "resourceAuditSelfTests": {"passed": 15},
+    "referencePluginBuild": {"warnings": 0, "errors": 0},
+    "optionalUnityFixtureReferenceBuild": {"warnings": 0, "errors": 0, "engineExecution": "not_executed"},
+    "bilingualResources": {"keysPerDictionary": 31, "satelliteFree": true},
+    "publicApiAudit": {"directGameMemberSites": 930, "uniqueGameMembers": 195, "gameTypes": 48, "nonpublicAccesses": 0, "unresolvedReferences": 0}
+  },
+  "buildIdentity": "faf4fc4751e78f2e4c6e6a57052480acf30fe2df12981d6ea25442170608d23e",
+  "assemblies": {
+    "DarkFogSynthesis.dll": "f665766e708e1f108f186fd3b0f9c841d4367b8acb7d7fb705811a0e6a3079fd",
+    "DarkFogSynthesis.Core.dll": "7f9fcd62bffd7f85b55fa324dd4b902eae179a1d56ab75a2091ad06f579481f2"
+  },
+  "gameReferenceSha256": "3c6d3211a948a528af1d4f813bffa5cc2d3bdddfacbc1a49dd7a29bb3b9deec9",
+  "initialFailedRun": {"run": 37264149383, "reason": "Fixed Core and Harmony suites passed. Deliberately removing the post-save check correctly failed the Core regression, but the temporary verifier expected a later assertion's text. Its expected-message match was corrected without disabling tests, and both mutation checks then passed in run 37264389718."},
+  "runtimeExecution": "not_executed",
+  "gameAcceptanceCases": {"total": 35, "executed": 0},
+  "releaseEligible": false,
+  "notice": "Historical verification only, not current build provenance or release acceptance. Ordinary read-only CI on the final documentation commit is separate evidence; it runs generated-project tests on Windows and Linux. Reference compilation did not launch Unity or DSP, execute native cleanup, write real game saves or qualify on-disk preservation. Recipes, identifiers, research costs, discovery rules, save formats and existing acceptance statuses are unchanged. No binaries, dependencies, saves, credentials or private reference paths are distributed in this record."
+}
