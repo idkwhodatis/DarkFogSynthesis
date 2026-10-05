@@ -18,11 +18,38 @@ def record(key,id,x,group='canvas-page-0',kind='technology',state='normal'):
     return dict(key=key,kind=kind,prototypeId=id,group=group,state=state,bounds=rect(x,20),container=rect(0,0,1000,600),clips=[])
 
 def fixture():
-    return dict(schemaVersion=3,stage='manual',uiLayout=dict(schemaVersion=1,status='captured',errors=[],language='fixture',
+    return dict(schemaVersion=3,stage='manual',uiLayout=dict(schemaVersion=2,clipSemantics='native-padded-rectmask2d',status='captured',errors=[],language='fixture',
         coordinateSystem='screen-pixels-bottom-left',viewport=rect(0,0,1000,600),
         records=[record('a',1951,20),record('b',1952,180),record('neighbor',1000,350)]))
 
 class Layout(unittest.TestCase):
+    def test_legacy_or_unqualified_mask_capture_refused(self):
+        s=fixture();s['uiLayout']['schemaVersion']=1
+        with self.assertRaisesRegex(ValueError,'schema 2'):m.check(s,'technology')
+        s=fixture();s['uiLayout'].pop('clipSemantics')
+        with self.assertRaisesRegex(ValueError,'mask semantics'):m.check(s,'technology')
+
+    def test_padded_mask_excludes_control_inside_raw_rectangle(self):
+        s=fixture();a=s['uiLayout']['records'][0];a['bounds']=rect(5,30,10,10)
+        a['clips']=[rect(20,0,160,100)] # Native [0,200] mask, left/right padding 20.
+        result=m.check(s,'technology',[1951])
+        self.assertIn({'control':'a','kind':'clipped','boundary':'clip-0'},result['issues'])
+
+    def test_nested_effective_masks(self):
+        s=fixture();a=s['uiLayout']['records'][0];a['bounds']=rect(30,30,10,10)
+        a['clips']=[rect(20,0,160,100),rect(35,0,120,100)]
+        result=m.check(s,'technology',[1951])
+        self.assertIn({'control':'a','kind':'clipped','boundary':'clip-1'},result['issues'])
+        self.assertNotIn({'control':'a','kind':'clipped','boundary':'clip-0'},result['issues'])
+
+    def test_effective_padding_at_nonunit_screen_scale(self):
+        # These are projected fixture rectangles, not a claim to execute Unity transforms.
+        # The companion EditMode tests exercise the actual production projection helper.
+        for scale in (1,1.5,2):
+            s=fixture();a=s['uiLayout']['records'][0];a['bounds']=rect(5*scale,30*scale,10*scale,10*scale)
+            a['clips']=[rect(20*scale,0,160*scale,100*scale)]
+            self.assertTrue(m.check(s,'technology',[1951])['issues'])
+
     def test_valid_frame(self):self.assertEqual(m.check(fixture(),'technology')['issues'],[])
     def test_overlap(self):
         s=fixture();s['uiLayout']['records'][2]['bounds']=rect(50,20)

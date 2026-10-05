@@ -10,6 +10,9 @@ namespace DarkFogSynthesis.Progression
     internal sealed class RuntimeProgression
     {
         private OwnedPrerequisiteChanges owned = OwnedPrerequisiteChanges.Empty;
+        // Retain representation only while the corresponding forward edit is owned. A combined
+        // cache may temporarily equal the explicit list after our append; that does not change its mode.
+        private PrerequisiteCacheModes ownedPreCacheModes = PrerequisiteCacheModes.Empty;
         private readonly Dictionary<int, TechProto[]> ownedPostCache = new Dictionary<int, TechProto[]>();
         private readonly Dictionary<int, OwnedReversePrerequisiteChange> ownedReverseLinks = new Dictionary<int, OwnedReversePrerequisiteChange>();
 
@@ -42,7 +45,15 @@ namespace DarkFogSynthesis.Progression
         private void ApplyPlan(PrerequisitePlan plan)
         {
             ContentRegistry.Require(plan.CanApply, "Cannot isolate progression changes: " + string.Join("; ", plan.Conflicts));
-            var cacheModes = new Dictionary<int, bool>();
+            var cacheModes = new Dictionary<int, PrerequisiteCacheMode>();
+            // Validate retained contracts even when repeated application produces no forward edit.
+            foreach (var entry in ownedPreCacheModes.Entries)
+            {
+                var tech = LDB.techs.Select(entry.Key)
+                    ?? throw new InvalidOperationException("Missing technology with an owned prerequisite cache: " + entry.Key);
+                PrerequisiteCachePolicy.Resolve(tech.PreTechs ?? Array.Empty<int>(), tech.PreTechsImplicit ?? Array.Empty<int>(),
+                    (tech.preTechArray ?? Array.Empty<TechProto>()).Select(t => t.ID), entry.Value);
+            }
             var beforeCache = new Dictionary<int, TechProto[]>();
             // Validate all cache contracts before touching any prototype.
             foreach (var edit in plan.Edits)
@@ -51,14 +62,13 @@ namespace DarkFogSynthesis.Progression
                 ContentRegistry.Require((tech.PreTechs ?? Array.Empty<int>()).SequenceEqual(edit.Before.Select(i => i.Value)), "Prerequisite graph changed while planning.");
                 var cache = tech.preTechArray ?? Array.Empty<TechProto>();
                 int[] ids = cache.Select(t => t.ID).ToArray();
-                var explicitIds = tech.PreTechs ?? Array.Empty<int>();
-                bool explicitOnly = ids.SequenceEqual(explicitIds);
-                bool combined = ids.SequenceEqual(explicitIds.Concat(tech.PreTechsImplicit ?? Array.Empty<int>()).Distinct());
-                ContentRegistry.Require(explicitOnly || combined, "Unknown preTechArray cache semantics on technology " + tech.ID);
-                cacheModes[tech.ID] = !explicitOnly && combined;
+                cacheModes[tech.ID] = ownedPreCacheModes.Resolve(tech.ID, tech.PreTechs ?? Array.Empty<int>(),
+                    tech.PreTechsImplicit ?? Array.Empty<int>(), ids);
                 beforeCache[tech.ID] = cache;
                 foreach (var id in edit.After) ContentRegistry.Require(LDB.techs.Select(id.Value) != null, "Missing prerequisite technology " + id);
             }
+            // Prepare ownership metadata before mutation, and publish it only after successful edits.
+            var nextPreCacheModes = ownedPreCacheModes.Retain(plan.OwnedChanges, cacheModes);
             // A third party replacing the cache is ambiguous. Do not delete its changes.
             foreach (var entry in ownedPostCache)
                 ContentRegistry.Require(ReferenceEquals(LDB.techs.Select(entry.Key).postTechArray, entry.Value),
@@ -94,7 +104,8 @@ namespace DarkFogSynthesis.Progression
                 {
                     var tech = LDB.techs.Select(edit.Tech.Value);
                     tech.PreTechs = edit.After.Select(t => t.Value).ToArray();
-                    var cacheIds = cacheModes[tech.ID] ? tech.PreTechs.Concat(tech.PreTechsImplicit ?? Array.Empty<int>()).Distinct() : tech.PreTechs;
+                    var cacheIds = PrerequisiteCachePolicy.Rebuild(tech.PreTechs,
+                        tech.PreTechsImplicit ?? Array.Empty<int>(), cacheModes[tech.ID]);
                     tech.preTechArray = cacheIds.Select(id => LDB.techs.Select(id)).ToArray();
                 }
                 // Own only a reverse edge that we actually appended. A preexisting or still-needed foreign
@@ -120,6 +131,7 @@ namespace DarkFogSynthesis.Progression
                         ownedReverseLinks[entry.Key] = entry.Value.OwnedChange;
                         ownedPostCache[entry.Key] = LDB.techs.Select(entry.Key).postTechArray;
                     }
+                ownedPreCacheModes = nextPreCacheModes;
             }
             catch
             {

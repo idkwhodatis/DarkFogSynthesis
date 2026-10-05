@@ -65,7 +65,8 @@ namespace DarkFogSynthesis.Diagnostics
             }
             return new
             {
-                schemaVersion = 1,
+                schemaVersion = 2,
+                clipSemantics = "native-padded-rectmask2d",
                 coordinateSystem = "screen-pixels-bottom-left",
                 status = errors.Count == 0 ? "captured" : "partial",
                 language = ObserveLanguage(),
@@ -97,7 +98,11 @@ namespace DarkFogSynthesis.Diagnostics
             if (container == null) throw new InvalidOperationException("No container rectangle");
             var clips = new List<object>();
             foreach (RectMask2D mask in rect.GetComponentsInParent<RectMask2D>(false))
-                if (mask.isActiveAndEnabled && mask.transform is RectTransform maskRect) clips.Add(Bounds(maskRect, canvas));
+                if (mask.isActiveAndEnabled)
+                {
+                    Rect clip = RectMaskClipCapture.ScreenBounds(mask, canvas);
+                    clips.Add(new { x = clip.x, y = clip.y, width = clip.width, height = clip.height });
+                }
             foreach (Mask mask in rect.GetComponentsInParent<Mask>(false))
                 if (mask.isActiveAndEnabled && mask.transform is RectTransform maskRect) clips.Add(Bounds(maskRect, canvas));
             return new { key, kind, prototypeId = id, group, state, focus, canvasScale = canvas.scaleFactor,

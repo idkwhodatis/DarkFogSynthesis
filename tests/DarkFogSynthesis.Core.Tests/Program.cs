@@ -61,6 +61,8 @@ namespace DarkFogSynthesis.Core.Tests
                 ("D03 all four configuration combinations", TruthTable),
                 ("T03 exact hidden/combat mapping", CombatMapping),
                 ("S04 peace-combat-peace restoration", CrossSaveIsolation),
+                ("S04 combined prerequisite cache semantics survive owned apply/restore",
+                    () => PrerequisiteCachePolicyTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("S03 ten repeated session loads are idempotent", RepeatedSessionLoads),
                 ("S04 existing vanilla or third-party edges stay unowned", PreexistingEdges),
                 ("S04 later unrelated third-party edges survive restore", ThirdPartyAppend),

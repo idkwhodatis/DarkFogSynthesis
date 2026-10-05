@@ -79,6 +79,11 @@ def tables(snapshot: dict) -> dict:
             key = record['id']
             if type(key) is not int or key <= 0 or key in out[table]:
                 raise ValueError(f'Invalid or duplicate {table} id: {key}')
+            if table == 'technologies':
+                if type(record['page']) is not int or record['page'] < 0:
+                    raise ValueError(f'Invalid technology page: /technologies/{key}/page')
+                if record['isLabTech'] is not None and type(record['isLabTech']) is not bool:
+                    raise ValueError(f'Invalid research classification: /technologies/{key}/isLabTech')
             out[table][key] = deepcopy(record)
     return out
 
@@ -141,9 +146,19 @@ def registration(before, after):
         raise ValueError('Unexpected assigned recipe-grid batch')
     if any(r['GridIndex'] in grids for r in before['recipes'].values()):
         raise ValueError('Assigned recipe-grid collision')
+    # Both owned technologies belong to the same native page as their known vanilla
+    # prerequisite anchors. Use the pre-registration observation, not an unverified
+    # hard-coded page number or the newly added technology's own reported value.
+    anchor_pages = {before['technologies'][anchor]['page'] for anchor in (1826, 1808)}
+    if len(anchor_pages) != 1:
+        raise ValueError('Native main-technology page anchors disagree; cannot qualify registration')
+    main_page = next(iter(anchor_pages))
     for key, (name, pre, implicit, items, points, cost, unlocks, position) in TECHS.items():
         actual = after['technologies'][key]
-        frozen = dict(id=key, nameKey=f'dark_fog_synthesis.tech.{name}.name', IsHiddenTech=False, Published=True,
+        if actual['isLabTech'] is None:
+            raise ValueError(f'Unobserved research classification: /technologies/{key}/isLabTech; capture is incomplete')
+        frozen = dict(id=key, nameKey=f'dark_fog_synthesis.tech.{name}.name', page=main_page,
+                      isLabTech=True, IsHiddenTech=False, Published=True,
                       IsObsolete=False, PreItem=[], PreTechs=pre, PreTechsImplicit=implicit, Items=items,
                       ItemPoints=points, HashNeeded=cost, UnlockRecipes=unlocks, unlockCache=unlocks, position=position)
         checks.extend(diff(frozen, {k: actual[k] for k in frozen}, f'/technologies/{key}'))

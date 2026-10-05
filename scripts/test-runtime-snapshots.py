@@ -87,6 +87,52 @@ class Snapshots(unittest.TestCase):
         before=fixture();after=registered(before)
         self.assertEqual(module.compare(before,after,'registration')['differences'], [])
 
+    def test_registration_research_classification_and_page(self):
+        for id in (1951, 1952):
+            for field, value in (('isLabTech', False), ('page', 999)):
+                with self.subTest(id=id, field=field):
+                    before = fixture(); after = registered(before)
+                    next(t for t in after['technologies'] if t['id'] == id)[field] = value
+                    result = module.compare(before, after, 'registration')
+                    self.assertEqual(result['status'], 'drift')
+                    self.assertIn(f'/technologies/{id}/{field}', [d['path'] for d in result['differences']])
+
+    def test_registration_unavailable_classification_refused(self):
+        for id in (1951, 1952):
+            before = fixture(); after = registered(before)
+            next(t for t in after['technologies'] if t['id'] == id)['isLabTech'] = None
+            with self.assertRaisesRegex(ValueError, f'/technologies/{id}/isLabTech'):
+                module.compare(before, after, 'registration')
+
+    def test_registration_page_uses_native_baseline_anchors(self):
+        before = fixture()
+        for t in before['technologies']: t['page'] = 1
+        after = registered(before)
+        for t in after['technologies']: t['page'] = 1
+        self.assertEqual(module.compare(before, after, 'registration')['status'], 'structural_match')
+        next(t for t in before['technologies'] if t['id'] == 1808)['page'] = 2
+        with self.assertRaisesRegex(ValueError, 'anchors disagree'):
+            module.compare(before, after, 'registration')
+
+    def test_registration_rejects_invalid_field_types(self):
+        for field, value in (('page', True), ('page', '0'), ('page', -1), ('isLabTech', 1), ('isLabTech', 'true')):
+            before = fixture(); after = registered(before)
+            next(t for t in after['technologies'] if t['id'] == 1951)[field] = value
+            with self.assertRaises(ValueError): module.compare(before, after, 'registration')
+
+    def test_registration_classification_cli_exit_codes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            before_path = Path(tmp) / 'before.json'; after_path = Path(tmp) / 'after.json'
+            before = fixture(); before_path.write_text(json.dumps(before), encoding='utf-8')
+            for field, value, code in (('isLabTech', True, 0), ('isLabTech', False, 1), ('isLabTech', None, 2), ('page', 999, 1)):
+                after = registered(before)
+                next(t for t in after['technologies'] if t['id'] == 1951)[field] = value
+                after_path.write_text(json.dumps(after), encoding='utf-8')
+                result = subprocess.run([sys.executable, str(SCRIPT), str(before_path), str(after_path),
+                                         '--phase', 'registration'], capture_output=True, text=True)
+                self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+                if code == 2: self.assertNotIn('structural_match', result.stdout)
+
     def test_registration_cache_link(self):
         before=fixture();after=registered(before)
         next(t for t in after['technologies'] if t['id']==1312)['unlockCache']=[]
