@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "classification": "source-and-reference-assembly-smoke-only",
+  "baselineCommit": "846e7e784704f32a719bdd5b8890a466547bda74",
+  "codeCommit": "c16244daa48720ec394080e8fa2c7451ba99cdd3",
+  "verificationWorkflowRun": 37276877981,
+  "verificationWorkflowJob": 111655735170,
+  "verificationWorkflowStatus": "success",
+  "executionOrder": "Applied the exact checksum-verified ten-file patch to staging commit 6e9c664f681cb260c26da845c5a4431e5805abbc, ran the listed tests, deliberate-check-removal regressions, reference builds and metadata audits, restored original source bytes after mutation tests, then committed and fast-forward pushed the tested code. All six temporary integration files were removed in the code commit. The returned source artifact matched all ten locally reviewed files byte-for-byte and contained no uncommitted diff.",
+  "patchSha256": "169e487d51f0e7c4174cdd041dfbcb691aaee0b7f2c017719eeae59bc7446314",
+  "checks": {
+    "pureCore": {"passed": 84, "assertions": 20457},
+    "harmlessHarmonyFixtures": {"passed": 30, "assertions": 593},
+    "removedCheckRegressions": {
+      "status": "passed",
+      "expectedAssertionFailures": 3,
+      "postExportValidation": "Removing the production post-export validation call was detected by both Core and actual Harmony managed fixtures, with the expected assertions rather than compilation errors.",
+      "pendingResearchHashes": "Ignoring both native hash fields in the production lab emptiness predicate was detected by the Core selector preflight/traversal regression.",
+      "restoration": "Original source bytes restored before reference compilation; no uncommitted diff remained."
+    },
+    "packagingFixtures": {"passed": 64, "host": "GitHub Actions Linux"},
+    "compilerCapture": {"assertions": 56, "host": "Linux"},
+    "checkoutAssets": {"passed": 3, "host": "Linux"},
+    "runtimeSnapshotFixtures": {"passed": 26},
+    "uiGeometryAndTextFixtures": {"passed": 17},
+    "generatedUnityProjectFixtures": {"passed": 5, "editorExecution": "not_executed"},
+    "resourceAuditSelfTests": {"passed": 15},
+    "referencePluginBuild": {"warnings": 0, "errors": 0},
+    "optionalUnityFixtureReferenceBuild": {"warnings": 0, "errors": 0, "engineExecution": "not_executed"},
+    "bilingualResources": {"keysPerDictionary": 31, "satelliteFree": true},
+    "publicApiAudit": {"directGameMemberSites": 976, "uniqueGameMembers": 198, "gameTypes": 48, "nonpublicAccesses": 0, "unresolvedReferences": 0}
+  },
+  "regressionCoverage": [
+    "Target identity, owned recipe/research configuration, resource/progress or location changes before export, during export or from an earlier reset refuse the later reset and do not enroll its stale rollback action.",
+    "Actual Harmony detours over harmless export/reset methods exercise the same production boundary; unchanged empty-target controls remain permitted.",
+    "The actual selector predicate and connected-stack traversal reject positive or negative hashBytes/extraHashBytes on selected or nonselected members, preserve input values and allow unchanged zero-state single/stacked labs.",
+    "Disconnected labs are not buffer-scanned; invalid, ambiguous or cyclic connected topology remains refused.",
+    "Existing absent/inactive Nebula single-player lifecycle and save-entry regressions remain passing. Multiplayer and general session admission code were not changed."
+  ],
+  "buildIdentity": "3d6602169ed75290e9203907f64cae94eb727e53c94edc46c54fd7866c51c6c4",
+  "assemblies": {
+    "DarkFogSynthesis.dll": "4714efa61403d9f7457f65a9a8ae53dce43a2bb532c0c3c6f58f5d96e328828e",
+    "DarkFogSynthesis.Core.dll": "d165dc918bd2970172dc947b66d727b4747cae4190f80e4b57c5ffe07a18ea6e"
+  },
+  "gameReferenceSha256": "3c6d3211a948a528af1d4f813bffa5cc2d3bdddfacbc1a49dd7a29bb3b9deec9",
+  "sourceArtifact": {"id": 11331020634, "sha256": "19c4656c0dca899e959be73287b1d346bd15e9bf9f1172dcef014f486a16d426", "reviewedFilesMatched": 10, "uncommittedDiffEmpty": true, "temporaryIntegrationFilesAbsent": true},
+  "localChecks": {"snapshots": 26, "uiGeometry": 17, "unityProjectGenerator": 5, "contentAndAssets": "passed", "csharpExecution": "not_executed_locally; C# tests and reference builds above ran in GitHub Actions"},
+  "runtimeExecution": "not_executed",
+  "gameAcceptanceCases": {"total": 35, "executed": 0},
+  "releaseEligible": false,
+  "notice": "Historical verification only, not current build provenance or release acceptance. Ordinary read-only CI on the documentation commit is separate evidence. Reference compilation did not launch Unity/DSP or execute native reset/export/rollback, production, research or actual game saves. Per-target identity/configuration checks are not a native generation counter or a transaction against arbitrary changes inside a native reset call. Recipes (including Silicon Neuron Titanium Alloy x2), identifiers, costs, discovery rules, save formats, networking policy and existing acceptance statuses are unchanged. No dependency binaries, game saves, credentials or private compiler-input paths are distributed in this record."
+}
