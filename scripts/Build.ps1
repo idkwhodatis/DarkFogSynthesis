@@ -21,6 +21,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Source content validation failed.' }
     & $Python scripts/test-ui-layout.py
     if ($LASTEXITCODE -ne 0) { throw 'UI layout diagnostic regressions failed.' }
+    & $Python scripts/test-unity-ui-project.py
+    if ($LASTEXITCODE -ne 0) { throw 'Generated Unity test project regressions failed.' }
     & $Python scripts/test-runtime-snapshots.py
     if ($LASTEXITCODE -ne 0) { throw 'Runtime snapshot comparator regressions failed.' }
     & $Python scripts/test-packaging.py

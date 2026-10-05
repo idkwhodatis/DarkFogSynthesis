@@ -20,3 +20,9 @@ padding on all four sides, nested masks, and an empty padded region. Retain the
 actual XML/log before claiming an engine-side pass. Pure Python geometry fixtures
 exercise only the receiving checker; reference compilation establishes API signatures,
 not the behavior of native Unity transforms. DSP panel usage still requires game acceptance.
+
+`python scripts/test-unity-ui-project.py` validates the generator's actual output
+without running Unity. The generated assembly references `UnityEngine.UI`, while
+the package dependency is `com.unity.ugui`. Opening and compiling this generated
+project in Unity is still required; standalone reference compilation does not
+exercise Unity's assembly-definition resolution.

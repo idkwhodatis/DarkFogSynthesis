@@ -165,6 +165,101 @@ class Snapshots(unittest.TestCase):
                 self.assertEqual(module.compare(after,restored,'restore',before)['differences'],[])
                 self.assertEqual(len(restored['recipes']),6)
 
+    def test_restore_explains_only_owned_null_to_empty_reverse_caches(self):
+        for child, parent in ((1901, 1820), (1902, 1811), (1903, 1809), (1904, 1818)):
+            base, applied = mode_pair()
+            next(t for t in base['technologies'] if t['id'] == parent)['postCache'] = None
+            restored = deepcopy(base); restored['stage'] = 'post-restore'
+            next(t for t in restored['technologies'] if t['id'] == parent)['postCache'] = []
+            original = deepcopy((base, applied, restored))
+            result = module.compare(applied, restored, 'restore', base)
+            self.assertEqual(result['status'], 'structural_match')
+            self.assertEqual(result['differences'], [])
+            self.assertEqual(result['normalizations'], [{'path': f'/technologies/{parent}/postCache',
+                'kind': 'owned-empty-reverse-cache-normalization', 'baseline': None, 'restored': []}])
+            self.assertEqual((base, applied, restored), original)
+
+    def test_restore_does_not_normalize_inactive_or_unrelated_caches(self):
+        base, applied = mode_pair(False, False)
+        for s in (base, applied):
+            next(t for t in s['technologies'] if t['id'] == 1809)['postCache'] = None
+        restored = deepcopy(base); restored['stage'] = 'post-restore'
+        next(t for t in restored['technologies'] if t['id'] == 1809)['postCache'] = []
+        result = module.compare(applied, restored, 'restore', base)
+        self.assertEqual(result['status'], 'drift'); self.assertEqual(result['normalizations'], [])
+        base, applied = mode_pair()
+        for s in (base, applied):
+            next(t for t in s['technologies'] if t['id'] == 1826)['postCache'] = None
+        restored = deepcopy(base); restored['stage'] = 'post-restore'
+        next(t for t in restored['technologies'] if t['id'] == 1826)['postCache'] = []
+        result = module.compare(applied, restored, 'restore', base)
+        self.assertEqual(result['status'], 'drift'); self.assertEqual(result['normalizations'], [])
+
+    def test_restore_preserves_surviving_foreign_reverse_links(self):
+        base, applied = mode_pair()
+        next(t for t in base['technologies'] if t['id'] == 1809)['postCache'] = [1901]
+        next(t for t in applied['technologies'] if t['id'] == 1809)['postCache'] = [1901, 1903]
+        restored = deepcopy(base); restored['stage'] = 'post-restore'
+        self.assertEqual(module.compare(applied, restored, 'restore', base)['status'], 'structural_match')
+        next(t for t in restored['technologies'] if t['id'] == 1809)['postCache'] = []
+        result = module.compare(applied, restored, 'restore', base)
+        self.assertEqual(result['status'], 'drift'); self.assertEqual(result['normalizations'], [])
+        self.assertIn('/technologies/1809/postCache', [d['path'] for d in result['differences']])
+
+    def test_restore_does_not_explain_an_unowned_or_still_needed_edge(self):
+        for field in ('PreTechs', 'PreTechsImplicit'):
+            base, applied = mode_pair()
+            target = next(t for t in base['technologies'] if t['id'] == 1903)
+            target[field] = [1809]
+            if field == 'PreTechs': target['preCache'] = [1809]
+            else: next(t for t in applied['technologies'] if t['id'] == 1903)[field] = [1809]
+            next(t for t in base['technologies'] if t['id'] == 1809)['postCache'] = None
+            restored = deepcopy(base); restored['stage'] = 'post-restore'
+            next(t for t in restored['technologies'] if t['id'] == 1809)['postCache'] = []
+            result = module.compare(applied, restored, 'restore', base)
+            self.assertEqual(result['status'], 'drift'); self.assertEqual(result['normalizations'], [])
+
+    def test_restore_still_detects_other_null_drift_and_missing_applied_link(self):
+        base, applied = mode_pair()
+        next(t for t in base['technologies'] if t['id'] == 1809)['postCache'] = None
+        restored = deepcopy(base); restored['stage'] = 'post-restore'
+        next(t for t in restored['technologies'] if t['id'] == 1809)['postCache'] = []
+        next(t for t in restored['technologies'] if t['id'] == 1951)['isLabTech'] = None
+        result = module.compare(applied, restored, 'restore', base)
+        self.assertEqual(result['status'], 'drift')
+        self.assertIn('/technologies/1951/isLabTech', [d['path'] for d in result['differences']])
+        next(t for t in applied['technologies'] if t['id'] == 1809)['postCache'] = []
+        result = module.compare(applied, restored, 'restore', base)
+        self.assertEqual(result['status'], 'drift'); self.assertEqual(result['normalizations'], [])
+        self.assertIn('/before-restore/technologies/1809/postCache', [d['path'] for d in result['differences']])
+
+    def test_restore_normalization_is_not_equal_mode_or_global_array_coercion(self):
+        base, applied = mode_pair()
+        for s in (base, applied):
+            next(t for t in s['technologies'] if t['id'] == 1809)['postCache'] = None
+        next(t for t in applied['technologies'] if t['id'] == 1809)['postCache'] = []
+        result = module.compare(base, applied, 'equal')
+        self.assertEqual(result['status'], 'drift'); self.assertEqual(result['normalizations'], [])
+        self.assertIn('/technologies/1809/postCache', [d['path'] for d in result['differences']])
+
+    def test_restore_normalization_cli_and_output_report(self):
+        base, applied = mode_pair()
+        next(t for t in base['technologies'] if t['id'] == 1809)['postCache'] = None
+        restored = deepcopy(base); restored['stage'] = 'post-restore'
+        next(t for t in restored['technologies'] if t['id'] == 1809)['postCache'] = []
+        with tempfile.TemporaryDirectory() as folder:
+            p = Path(folder)
+            for name, obj in (('base', base), ('applied', applied), ('restored', restored)):
+                (p / (name + '.json')).write_text(json.dumps(obj), encoding='utf-8')
+            args = [sys.executable, str(SCRIPT), str(p / 'applied.json'), str(p / 'restored.json'),
+                    '--phase', 'restore', '--baseline', str(p / 'base.json'), '--output', str(p / 'result.json')]
+            result = subprocess.run(args, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            output = json.loads((p / 'result.json').read_text())
+            self.assertEqual(len(output['normalizations']), 1)
+            self.assertEqual(output['differences'], [])
+            self.assertEqual(output, json.loads(result.stdout))
+
     def test_restore_requires_correct_baseline(self):
         before,after=mode_pair();restored=deepcopy(before);restored['stage']='post-restore'
         with self.assertRaises(ValueError):module.compare(after,restored,'restore')

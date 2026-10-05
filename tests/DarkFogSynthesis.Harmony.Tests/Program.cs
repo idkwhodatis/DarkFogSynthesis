@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -54,7 +56,9 @@ namespace DarkFogSynthesis.Harmony.Tests
                 Run("ordinary native Begin retains pending-session Resume", PendingBeginResume);
                 Run("validated replacement callbacks retain active maintenance quarantine", MaintenanceQuarantineReplacement);
                 Run("foreign Resume prefixes cannot redirect failed-preflight restoration", FailedPreflightResumeReplacement);
-                Console.WriteLine("PASS: " + assertions + " assertions across 22 real Harmony pipeline cases");
+                Run("candidate-save history mutation rejects success while retaining quarantine", CandidateSaveHistoryMutation);
+                Run("unchanged candidate-save history passes both preservation checks", CandidateSaveHistoryPreserved);
+                Console.WriteLine("PASS: " + assertions + " assertions across 24 real Harmony pipeline cases");
                 Console.WriteLine("Boundary: no game integration, actual disk saves, cleanup, or uninstall tested.");
                 return 0;
             }
@@ -554,6 +558,65 @@ namespace DarkFogSynthesis.Harmony.Tests
             current.QuarantinedIdentity = current.Identity;
             HarmlessResume();
             Check(current.NativeResumeCalls == 0 && current.Paused, "Quarantined candidate resumed");
+        }
+
+        private static void CandidateSaveHistoryPreserved() => VerifyCandidateHistory("none");
+
+        private static void CandidateSaveHistoryMutation()
+        {
+            foreach (string change in new[] { "recipe", "tech-remove", "tech-value", "queue", "current" })
+                VerifyCandidateHistory(change);
+        }
+
+        private static void VerifyCandidateHistory(string change)
+        {
+            var guard = PrepareMaintenance();
+            object identity = current.Identity, history = current.History, player = current.Player;
+            current.QuarantinedIdentity = identity;
+            current.PermittedName = "maintenance-candidate";
+            var expectedRecipes = new[] { 10, 11 };
+            var expectedTechs = new Dictionary<int, long> { [100] = 10, [101] = 20 };
+            var expectedQueue = new[] { 100, 101, 0 };
+            var recipes = new HashSet<int>(expectedRecipes);
+            var techs = new Dictionary<int, long>(expectedTechs);
+            var queue = expectedQueue.ToList();
+            int activeTech = 100, reports = 0, checks = 0, callbacks = 0;
+            current.SaveCallback = () => {
+                callbacks++;
+                switch (change)
+                {
+                    case "recipe": recipes.Remove(10); break;
+                    case "tech-remove": techs.Remove(101); break;
+                    case "tech-value": techs[101]++; break;
+                    case "queue": queue.Reverse(); break;
+                    case "current": activeTech = 101; break;
+                }
+            };
+            Exception? observed = null;
+            try
+            {
+                RemovalHistoryGuard.VerifyAcrossSave(() => {
+                    checks++;
+                    RequirePausedMaintenance(guard);
+                    RemovalHistoryGuard.EnsurePreserved(expectedRecipes, expectedTechs, expectedQueue, 100,
+                        recipes, techs, queue, activeTech);
+                }, () => Check(HarmlessNamedSave("maintenance-candidate"), "Candidate save original was refused"));
+                reports++;
+            }
+            catch (InvalidOperationException error) { observed = error; }
+            finally { current.PermittedName = null; current.Cleaning = false; }
+            Check(callbacks == 1 && checks == 2 && current.NativeSaveCalls == 1 && current.WritesInProgress == 0,
+                "Both-side preservation check must surround an actual Harmony-patched save callback");
+            Check(ReferenceEquals(current.Identity, identity) && ReferenceEquals(current.History, history) &&
+                ReferenceEquals(current.Player, player), "This case must not depend on replacing native session identities");
+            Check((observed == null) == (change == "none") && reports == (change == "none" ? 1 : 0),
+                "Candidate-save callback " + change + " gave an incorrect preservation result");
+            Check(ReferenceEquals(current.QuarantinedIdentity, identity), "History verification released quarantine");
+            if (change == "tech-remove") Check(!techs.ContainsKey(101), "Guard repaired another mod's history");
+            if (change == "recipe") Check(!recipes.Contains(10), "Guard repaired another mod's unlocks");
+            HarmlessResume();
+            Check(current.Paused && current.NativeResumeCalls == 0 && !HarmlessAutoSave() &&
+                !HarmlessNamedSave("maintenance-candidate"), "Expired maintenance permit or quarantine was bypassed");
         }
 
         private static void MaintenanceCallbackChanges()

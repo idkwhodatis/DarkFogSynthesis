@@ -198,10 +198,35 @@ def apply_mode(before, enabled):
     return expected
 
 
+def normalize_restored_empty_reverse_caches(expected, applied, restored, enabled):
+    """Only a null -> [owned child] -> [] reverse-cache round trip is equivalent.
+
+    No surviving explicit/implicit edge may require that child. Other null fields,
+    unrelated caches, missing links and arbitrary representation changes remain drift.
+    Mutate only the detached expected tables, never caller snapshots.
+    """
+    observations = []
+    if not enabled:
+        return observations
+    for child, parent in EDGES.items():
+        target = expected['technologies'][child]
+        prior = expected['technologies'][parent]
+        observed = restored['technologies'].get(parent)
+        if (prior['postCache'] is None and applied['technologies'][parent]['postCache'] == [child]
+                and parent not in array(target, 'PreTechs') + array(target, 'PreTechsImplicit')
+                and observed is not None and observed['postCache'] == []):
+            prior['postCache'] = []
+            observations.append({'path': f'/technologies/{parent}/postCache',
+                                 'kind': 'owned-empty-reverse-cache-normalization',
+                                 'baseline': None, 'restored': []})
+    return observations
+
+
 def compare(left, right, phase, baseline=None):
     before, after = tables(left), tables(right)
     context(left, right, session=phase in ('mode', 'restore'))
     checks = []
+    normalizations = []
     if phase == 'registration':
         if (left['stage'], right['stage']) != ('pre-register', 'post-bind'):
             raise ValueError('Registration requires pre-register -> post-bind snapshots')
@@ -221,6 +246,8 @@ def compare(left, right, phase, baseline=None):
             raise ValueError('Baseline mode policy differs')
         checks.extend(diff(apply_mode(base, baseline['policy']['effectiveApply']), before, '/before-restore'))
         expected = base
+        normalizations = normalize_restored_empty_reverse_caches(
+            expected, before, after, baseline['policy']['effectiveApply'])
     elif phase == 'equal':
         expected = before
     else:
@@ -228,7 +255,7 @@ def compare(left, right, phase, baseline=None):
     checks.extend(diff(expected, after))
     return {'schemaVersion': 1, 'phase': phase, 'status': 'structural_match' if not checks else 'drift',
             'scope': 'exported prototype fields only; no game acceptance, save safety or fault attribution',
-            'differences': checks}
+            'differences': checks, 'normalizations': normalizations}
 
 
 def main():

@@ -24,7 +24,7 @@ def prepare(output):
                    ROOT / 'tests/DarkFogSynthesis.Unity.Tests/RectMaskClipCaptureTests.cs'):
         shutil.copyfile(source, editor / source.name)
     (editor / 'DarkFogSynthesis.UiGeometry.Tests.asmdef').write_text(json.dumps({
-        'name': 'DarkFogSynthesis.UiGeometry.Tests', 'references': ['Unity.ugui'],
+        'name': 'DarkFogSynthesis.UiGeometry.Tests', 'references': ['UnityEngine.UI'],
         'optionalUnityReferences': ['TestAssemblies'], 'includePlatforms': ['Editor']
     }, indent=2) + '\n', encoding='utf-8')
     (output / 'Packages').mkdir()

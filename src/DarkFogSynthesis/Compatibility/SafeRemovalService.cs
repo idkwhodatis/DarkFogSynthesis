@@ -174,6 +174,16 @@ namespace DarkFogSynthesis.Compatibility
                 var originalRecipes = new HashSet<int>(history.recipeUnlocked);
                 var originalTechs = new Dictionary<int, TechState>(history.techStates);
                 var originalQueue = (int[])history.techQueue.Clone();
+                var expectedRecipes = originalRecipes.Where(id => !Recipes.Contains(id)).ToArray();
+                var expectedTechs = originalTechs.Where(k => !Technologies.Contains(k.Key)).ToDictionary(k => k.Key, k => k.Value);
+                var expectedQueue = originalQueue.Where(id => id != 0 && !Technologies.Contains(id)).ToArray();
+                int expectedCurrentTech = history.currentTech;
+                void VerifyPreservedHistory()
+                {
+                    RequirePausedSession(session);
+                    RemovalHistoryGuard.EnsurePreserved(expectedRecipes, expectedTechs, expectedQueue, expectedCurrentTech,
+                        history.recipeUnlocked, history.techStates, history.techQueue, history.currentTech);
+                }
                 lock (SaveGate)
                 {
                     RequirePausedSession(session);
@@ -235,20 +245,14 @@ namespace DarkFogSynthesis.Compatibility
                 var remaining = Scan(data, true);
                 if (remaining.Blockers.Count != 0 || remaining.Assemblers.Count != 0 || remaining.Labs.Count != 0)
                     throw new InvalidOperationException("Reference sweep did not finish cleanly: " + string.Join("; ", remaining.Blockers));
-                if (!originalRecipes.Where(id => !Recipes.Contains(id)).ToHashSetCompat().SetEquals(history.recipeUnlocked))
-                    throw new InvalidOperationException("An unrelated recipe unlock changed; cleanup is being rolled back.");
-                if (originalTechs.Where(k => !Technologies.Contains(k.Key)).Any(k => !history.techStates.TryGetValue(k.Key, out var value) || !value.Equals(k.Value))
-                    || history.techStates.Count != originalTechs.Count(k => !Technologies.Contains(k.Key)))
-                    throw new InvalidOperationException("Unrelated research state changed; cleanup is being rolled back.");
-                var expectedQueue = originalQueue.Where(id => id != 0 && !Technologies.Contains(id)).ToArray();
-                if (!history.techQueue.Where(id => id != 0).SequenceEqual(expectedQueue))
-                    throw new InvalidOperationException("Unrelated research queue entries changed; cleanup is being rolled back.");
-                RequirePausedSession(session);
-                SaveNewAndVerify(candidateName, session);
+                // Saving invokes peer callbacks. Validate the same captured history on BOTH sides;
+                // object identity and a custom-ID scan alone cannot establish vanilla preservation.
+                RemovalHistoryGuard.VerifyAcrossSave(VerifyPreservedHistory, () => SaveNewAndVerify(candidateName, session));
                 RequirePausedSession(session);
                 var afterSave = Scan(data, true);
                 if (afterSave.Blockers.Count != 0 || afterSave.Assemblers.Count != 0 || afterSave.Labs.Count != 0)
                     throw new InvalidOperationException("Native save callbacks reintroduced known custom references. The candidate is not accepted.");
+                VerifyPreservedHistory();
                 string reportDir = Path.Combine(Paths.ConfigPath, "DarkFogSynthesis", "diagnostics");
                 Directory.CreateDirectory(reportDir);
                 File.WriteAllText(Path.Combine(reportDir, "removal-" + token + ".json"), new JavaScriptSerializer().Serialize(new
@@ -276,7 +280,7 @@ namespace DarkFogSynthesis.Compatibility
                     try { RequirePausedSession(session); } catch (Exception error) { errors.Add(error); }
                 if (errors.Count != 0) throw new AggregateException("Cleanup failed and in-memory rollback was incomplete. Keep the game paused and reload backup " + backupName + ". Never overwrite the original.", new[] { original }.Concat(errors));
                 if (rollback.Count != 0)
-                    throw new InvalidOperationException("Cleanup failed; in-memory changes were restored and the game remains paused. Reload the backup before continuing. Backup: " + backupName + "; candidate (if created, do not treat as successful): " + candidateName + ". " + original.Message, original);
+                    throw new InvalidOperationException("Cleanup failed; this mod's in-memory edits were rolled back; unrelated callback writes were not undone. The game remains paused. Reload the backup before continuing. Backup: " + backupName + "; candidate (if created, do not treat as successful): " + candidateName + ". " + original.Message, original);
                 throw;
             }
             finally
@@ -384,7 +388,6 @@ namespace DarkFogSynthesis.Compatibility
             var file = new FileInfo(GameSave.SavePath(name));
             if (!file.Exists || file.Length == 0) throw new IOException("Native save did not produce a nonempty file: " + name);
         }
-        private static HashSet<int> ToHashSetCompat(this IEnumerable<int> values) => new HashSet<int>(values);
 
         private sealed class ScanResult
         {
