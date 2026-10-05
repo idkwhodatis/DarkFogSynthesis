@@ -82,4 +82,178 @@ public sealed class RectMaskClipCaptureTests
         mask.padding = new Vector4(1000, 1000, 1000, 1000);
         Assert.Throws<InvalidOperationException>(() => RectMaskClipCapture.ScreenBounds(mask, canvas));
     }
+
+    private Canvas ChildCanvas(Transform parent, bool overrideSorting)
+    {
+        var go = new GameObject("nested-canvas", typeof(RectTransform), typeof(Canvas));
+        go.transform.SetParent(parent, false);
+        var nested = go.GetComponent<Canvas>();
+        nested.overrideSorting = overrideSorting;
+        return nested;
+    }
+
+    private Image Graphic(Transform parent, float x = 0f)
+    {
+        var go = new GameObject("observed-graphic", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        var rect = go.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+        rect.sizeDelta = new Vector2(10, 10);
+        rect.anchoredPosition = new Vector2(x, 0);
+        return go.GetComponent<Image>();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void OuterRectMaskRespectsSortingBoundaryAndNativeClipping(bool overrideSorting)
+    {
+        var outer = Mask(root.transform, 100, 100);
+        var nested = ChildCanvas(outer.transform, overrideSorting);
+        var graphic = Graphic(nested.transform, 200); // Outside only the outer mask.
+        Canvas.ForceUpdateCanvases();
+        outer.PerformClipping();
+        var clips = RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas);
+        Assert.That(clips.Length, Is.EqualTo(overrideSorting ? 0 : 1));
+        Assert.That(graphic.canvasRenderer.hasRectClipping, Is.EqualTo(!overrideSorting));
+        if (!overrideSorting)
+            Assert.That(clips[0], Is.EqualTo(RectMaskClipCapture.ScreenBounds(outer, canvas)));
+        Assert.That(nested.overrideSorting, Is.EqualTo(overrideSorting));
+    }
+
+    [TestCase(false, 1f)]
+    [TestCase(true, 1f)]
+    [TestCase(false, 1.5f)]
+    [TestCase(true, 1.5f)]
+    public void InnerPaddedMaskRemainsBelowBoundary(bool overrideSorting, float scale)
+    {
+        canvas.scaleFactor = scale;
+        var outer = Mask(root.transform, 240, 120);
+        var nested = ChildCanvas(outer.transform, overrideSorting);
+        var inner = Mask(nested.transform, 100, 80);
+        inner.padding = new Vector4(5, 4, 6, 3);
+        var graphic = Graphic(inner.transform);
+        Canvas.ForceUpdateCanvases();
+        inner.PerformClipping();
+        var clips = RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas);
+        Assert.That(clips.Length, Is.EqualTo(overrideSorting ? 1 : 2));
+        CollectionAssert.Contains(clips, RectMaskClipCapture.ScreenBounds(inner, canvas));
+        if (overrideSorting)
+            CollectionAssert.DoesNotContain(clips, RectMaskClipCapture.ScreenBounds(outer, canvas));
+        else
+            CollectionAssert.Contains(clips, RectMaskClipCapture.ScreenBounds(outer, canvas));
+        Assert.That(graphic.canvasRenderer.hasRectClipping, Is.True);
+        Assert.That(inner.padding, Is.EqualTo(new Vector4(5, 4, 6, 3)));
+    }
+
+    [Test]
+    public void IgnoredInvalidOuterMaskIsNeverProjected()
+    {
+        var outer = Mask(root.transform);
+        outer.padding = new Vector4(1000, 1000, 1000, 1000);
+        var nested = ChildCanvas(outer.transform, true);
+        var graphic = Graphic(nested.transform);
+        Canvas.ForceUpdateCanvases();
+        Assert.That(RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas), Is.Empty);
+        Assert.Throws<InvalidOperationException>(() => RectMaskClipCapture.ScreenBounds(outer, canvas));
+    }
+
+    [Test]
+    public void SameObjectMaskDoesNotClipItsOwnGraphic()
+    {
+        var outer = Mask(root.transform, 240, 120);
+        var graphic = Graphic(outer.transform);
+        graphic.gameObject.AddComponent<RectMask2D>();
+        Canvas.ForceUpdateCanvases();
+        var clips = RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas);
+        CollectionAssert.AreEqual(new[] { RectMaskClipCapture.ScreenBounds(outer, canvas) }, clips);
+    }
+
+    [Test]
+    public void DisabledNearestMaskLeavesApplicableOuterMask()
+    {
+        var outer = Mask(root.transform, 240, 120);
+        var inner = Mask(outer.transform);
+        inner.enabled = false;
+        var graphic = Graphic(inner.transform);
+        Canvas.ForceUpdateCanvases();
+        CollectionAssert.AreEqual(new[] { RectMaskClipCapture.ScreenBounds(outer, canvas) },
+            RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas));
+        Assert.That(inner.enabled, Is.False);
+    }
+
+    [Test]
+    public void NonMaskableGraphicIgnoresBothMaskKinds()
+    {
+        var outer = Mask(root.transform);
+        var stencil = Graphic(outer.transform);
+        stencil.gameObject.AddComponent<UnityEngine.UI.Mask>();
+        var graphic = Graphic(stencil.transform);
+        graphic.maskable = false;
+        Canvas.ForceUpdateCanvases();
+        Assert.That(RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas), Is.Empty);
+        Assert.That(graphic.maskable, Is.False);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void StencilMasksRespectSameSortingBoundary(bool overrideSorting)
+    {
+        var outer = Graphic(root.transform);
+        var outerMask = outer.gameObject.AddComponent<UnityEngine.UI.Mask>();
+        var nested = ChildCanvas(outer.transform, overrideSorting);
+        var inner = Graphic(nested.transform);
+        var innerMask = inner.gameObject.AddComponent<UnityEngine.UI.Mask>();
+        var graphic = Graphic(inner.transform);
+        Canvas.ForceUpdateCanvases();
+        Assert.That(RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas).Length,
+            Is.EqualTo(overrideSorting ? 1 : 2));
+        Assert.That(outerMask.enabled && innerMask.enabled, Is.True);
+    }
+
+    [Test]
+    public void GraphicOnSortingCanvasDoesNotInheritOuterMasks()
+    {
+        var outer = Mask(root.transform);
+        var outerGraphic = outer.gameObject.AddComponent<Image>();
+        outerGraphic.gameObject.AddComponent<UnityEngine.UI.Mask>();
+        var nested = ChildCanvas(outer.transform, true);
+        var graphic = nested.gameObject.AddComponent<Image>();
+        Canvas.ForceUpdateCanvases();
+        Assert.That(RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas), Is.Empty);
+    }
+
+    [Test]
+    public void TogglingSortingAndReparentingDoesNotReuseMaskInventory()
+    {
+        var outer = Mask(root.transform);
+        var nested = ChildCanvas(outer.transform, false);
+        var graphic = Graphic(nested.transform);
+        for (int i = 0; i < 3; i++)
+        {
+            nested.overrideSorting = false;
+            Canvas.ForceUpdateCanvases();
+            Assert.That(RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas).Length, Is.EqualTo(1));
+            nested.overrideSorting = true;
+            Canvas.ForceUpdateCanvases();
+            Assert.That(RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas), Is.Empty);
+        }
+        graphic.transform.SetParent(root.transform, false);
+        Canvas.ForceUpdateCanvases();
+        Assert.That(RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas), Is.Empty);
+    }
+
+    [Test]
+    public void LayoutOnlyOrInactiveGraphicRefusesCaptureWithoutAddingComponents()
+    {
+        var nested = ChildCanvas(root.transform, false);
+        int count = nested.GetComponents<Component>().Length;
+        Assert.Throws<InvalidOperationException>(() =>
+            RectMaskClipCapture.ScreenClips(nested.GetComponent<RectTransform>(), canvas));
+        Assert.That(nested.GetComponents<Component>().Length, Is.EqualTo(count));
+        var graphic = Graphic(nested.transform);
+        graphic.enabled = false;
+        Assert.Throws<InvalidOperationException>(() => RectMaskClipCapture.ScreenClips(graphic.rectTransform, canvas));
+        Assert.That(graphic.enabled, Is.False);
+    }
+
 }

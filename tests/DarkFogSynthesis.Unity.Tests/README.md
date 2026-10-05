@@ -26,3 +26,15 @@ without running Unity. The generated assembly references `UnityEngine.UI`, while
 the package dependency is `com.unity.ugui`. Opening and compiling this generated
 project in Unity is still required; standalone reference compilation does not
 exercise Unity's assembly-definition resolution.
+
+The same production helper now also selects masks for an actual MaskableGraphic.
+Additional EditMode cases cover ordinary and override-sorting canvases, inner masks
+below a sorting boundary, disabled/self masks, unmaskable graphics, stencil-mask
+boundaries, dynamic reparenting, and native CanvasRenderer clipping state. A
+layout-only or inactive graphic is an unavailable observation, not a masking pass.
+These tests are added for engine execution, not claimed to have run in ordinary CI.
+
+Recapture runtime UI observations with nested **uiLayout schema 3**, the existing
+padded-mask semantics, and `maskSelection: native-graphic-sorting-boundaries`.
+Schema-2 captures did not filter inapplicable ancestor masks and are now refused.
+See `docs/compatibility/mask-selection-review.md` for the exact scope and limits.

@@ -18,16 +18,47 @@ def record(key,id,x,group='canvas-page-0',kind='technology',state='normal'):
     return dict(key=key,kind=kind,prototypeId=id,group=group,state=state,bounds=rect(x,20),container=rect(0,0,1000,600),clips=[])
 
 def fixture():
-    return dict(schemaVersion=3,stage='manual',uiLayout=dict(schemaVersion=2,clipSemantics='native-padded-rectmask2d',status='captured',errors=[],language='fixture',
+    return dict(schemaVersion=3,stage='manual',uiLayout=dict(schemaVersion=3,clipSemantics='native-padded-rectmask2d',maskSelection='native-graphic-sorting-boundaries',status='captured',errors=[],language='fixture',
         coordinateSystem='screen-pixels-bottom-left',viewport=rect(0,0,1000,600),
         records=[record('a',1951,20),record('b',1952,180),record('neighbor',1000,350)]))
 
 class Layout(unittest.TestCase):
     def test_legacy_or_unqualified_mask_capture_refused(self):
         s=fixture();s['uiLayout']['schemaVersion']=1
-        with self.assertRaisesRegex(ValueError,'schema 2'):m.check(s,'technology')
+        with self.assertRaisesRegex(ValueError,'schema 3'):m.check(s,'technology')
         s=fixture();s['uiLayout'].pop('clipSemantics')
         with self.assertRaisesRegex(ValueError,'mask semantics'):m.check(s,'technology')
+
+    def test_previous_padded_capture_still_requires_new_selection(self):
+        s=fixture();s['uiLayout']['schemaVersion']=2
+        with self.assertRaisesRegex(ValueError,'schema 3'):m.check(s,'technology')
+        for value in (None,'all-active-ancestors','',True):
+            s=fixture();s['uiLayout']['maskSelection']=value
+            with self.assertRaisesRegex(ValueError,'mask-selection'):m.check(s,'technology')
+        s=fixture();s['uiLayout'].pop('maskSelection')
+        with self.assertRaisesRegex(ValueError,'mask-selection'):m.check(s,'technology')
+
+    def test_effective_mask_inventory_fixtures(self):
+        # Checker integration only; actual Unity mask selection is covered in EditMode.
+        for kind,ids in (('technology',[1951]),('lab-choice',None)):
+            s=fixture()
+            if kind=='lab-choice':
+                s['uiLayout']['records']=[record('custom',48102,200,'lab-1',kind,'unlocked')]
+            s['uiLayout']['records']=s['uiLayout']['records'][:1]
+            a=s['uiLayout']['records'][0];a['bounds']=rect(200,20,60,40)
+            self.assertEqual(m.check(s,kind,ids)['issues'],[]) # overrideSorting excluded outer
+            a['clips']=[rect(180,0,100,100)] # valid inner mask survives
+            self.assertEqual(m.check(s,kind,ids)['issues'],[])
+            a['clips'].append(rect(0,0,100,100)) # ordinary canvas still subject to outer
+            self.assertIn({'control':a['key'],'kind':'clipped','boundary':'clip-1'},m.check(s,kind,ids)['issues'])
+
+    def test_old_mask_capture_cli_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            p=Path(folder)/'old.json';s=fixture();s['uiLayout']['schemaVersion']=2
+            p.write_text(json.dumps(s));before=p.read_bytes()
+            result=subprocess.run([sys.executable,str(SCRIPT),str(p),'--kind','technology'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,2,result.stdout+result.stderr)
+            self.assertIn('schema 3',result.stderr);self.assertEqual(p.read_bytes(),before)
 
     def test_padded_mask_excludes_control_inside_raw_rectangle(self):
         s=fixture();a=s['uiLayout']['records'][0];a['bounds']=rect(5,30,10,10)

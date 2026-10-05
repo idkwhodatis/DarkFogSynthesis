@@ -65,8 +65,9 @@ namespace DarkFogSynthesis.Diagnostics
             }
             return new
             {
-                schemaVersion = 2,
+                schemaVersion = 3,
                 clipSemantics = "native-padded-rectmask2d",
+                maskSelection = "native-graphic-sorting-boundaries",
                 coordinateSystem = "screen-pixels-bottom-left",
                 status = errors.Count == 0 ? "captured" : "partial",
                 language = ObserveLanguage(),
@@ -96,17 +97,10 @@ namespace DarkFogSynthesis.Diagnostics
             Canvas canvas, RectTransform? container, string state, float? focus)
         {
             if (container == null) throw new InvalidOperationException("No container rectangle");
-            var clips = new List<object>();
-            foreach (RectMask2D mask in rect.GetComponentsInParent<RectMask2D>(false))
-                if (mask.isActiveAndEnabled)
-                {
-                    Rect clip = RectMaskClipCapture.ScreenBounds(mask, canvas);
-                    clips.Add(new { x = clip.x, y = clip.y, width = clip.width, height = clip.height });
-                }
-            foreach (Mask mask in rect.GetComponentsInParent<Mask>(false))
-                if (mask.isActiveAndEnabled && mask.transform is RectTransform maskRect) clips.Add(Bounds(maskRect, canvas));
+            var clips = RectMaskClipCapture.ScreenClips(rect, canvas)
+                .Select(clip => new { x = clip.x, y = clip.y, width = clip.width, height = clip.height }).ToArray();
             return new { key, kind, prototypeId = id, group, state, focus, canvasScale = canvas.scaleFactor,
-                bounds = Bounds(rect, canvas), container = Bounds(container, canvas), clips = clips.ToArray() };
+                bounds = Bounds(rect, canvas), container = Bounds(container, canvas), clips };
         }
 
         private static object Bounds(RectTransform rect, Canvas canvas)

@@ -38,9 +38,10 @@ def check(report,kind,tech_ids=None,state=None,padding=2):
     if not isinstance(report,dict) or report.get('schemaVersion')!=3 or report.get('stage')!='manual':raise ValueError('Use a manual schema-3 runtime export')
     if type(padding) not in (int,float) or not math.isfinite(padding) or padding<0:raise ValueError('Invalid padding')
     ui=report.get('uiLayout')
-    if not isinstance(ui,dict) or ui.get('schemaVersion')!=2 or ui.get('status')!='captured' or ui.get('errors')!=[]:
-        raise ValueError('UI capture is absent, partial or predates padded-mask capture; recapture with UI schema 2')
+    if not isinstance(ui,dict) or ui.get('schemaVersion')!=3 or ui.get('status')!='captured' or ui.get('errors')!=[]:
+        raise ValueError('UI capture is absent, partial or predates effective-mask selection; recapture with UI schema 3')
     if ui.get('clipSemantics')!='native-padded-rectmask2d':raise ValueError('Missing effective padded-mask semantics')
+    if ui.get('maskSelection')!='native-graphic-sorting-boundaries':raise ValueError('Missing native graphic mask-selection semantics; recapture this frame')
     if ui.get('coordinateSystem')!='screen-pixels-bottom-left':raise ValueError('Unsupported coordinate system')
     viewport=rectangle(ui['viewport'])
     records=ui.get('records')
