@@ -14,7 +14,7 @@ namespace DarkFogSynthesis.Core.Definitions
                 new[] { A(VanillaIds.Items.CrystalSilicon, 2), A(VanillaIds.Items.PhotonCombiner, 1), A(VanillaIds.Items.PlasmaExciter, 1), A(VanillaIds.Items.TitaniumGlass, 1) },
                 240, ProductionMachine.MatrixLab, ProtoIds.InformationTopology),
             new RecipeDefinition(ProtoIds.SiliconNeuron, "silicon_neuron", A(VanillaIds.Items.SiliconNeuron, 1),
-                new[] { A(VanillaIds.Items.MicrocrystallineComponent, 2), A(VanillaIds.Items.ParticleBroadband, 1), A(VanillaIds.Items.CrystalSilicon, 2) },
+                new[] { A(VanillaIds.Items.MicrocrystallineComponent, 2), A(VanillaIds.Items.TitaniumAlloy, 2), A(VanillaIds.Items.CrystalSilicon, 2) },
                 240, ProductionMachine.Assembler, VanillaIds.Techs.InformationMatrix),
             new RecipeDefinition(ProtoIds.MatterRecombinator, "matter_recombinator", A(VanillaIds.Items.MatterRecombinator, 1),
                 new[] { A(VanillaIds.Items.PlaneFilter, 1), A(VanillaIds.Items.SuperMagneticRing, 2), A(VanillaIds.Items.Hydrogen, 2), A(VanillaIds.Items.CrystalSilicon, 2) },

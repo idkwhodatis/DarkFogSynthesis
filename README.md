@@ -92,3 +92,11 @@ Peace Mode always adds the four agreed combat prerequisites to the four vanilla 
 **Do not assume deleting the DLL is safe.** Active machines, research/crafting queues and blueprints may retain custom IDs. A fully validated “Prepare a Vanilla-Compatible Save” operation is not currently established. Retain or restore the untouched pre-Mod backup for ordinary play; do not overwrite it with experimental saves. 不能将“产物全是原版物品”视为安全卸载证明。
 
 Original editable art and generated PNGs are covered by the [MIT license](LICENSE); see [asset provenance](assets/README.md). No game or framework binaries are distributed.
+
+## Approved Silicon Neuron recipe revision / 已批准的配方修改
+
+Silicon Neuron now requires Microcrystalline Component ×2, Titanium Alloy ×2, and Crystal Silicon ×2. Output (one), recipe ID 48103, unlock technology 1312 and 240-tick base time are unchanged.
+
+硅基神经元：微晶元件 ×2；钛合金 ×2；晶格硅 ×2。此修改覆盖原计划中的粒子宽带 ×1。
+
+**Experimental-save upgrade boundary:** no migration of buffered/in-flight material from the previous ingredient layout is claimed. Before upgrading, use the old build to drain/reset Silicon Neuron machines and finish/cancel related handcraft jobs, then retain an untouched backup. New ingredients are not a license to reinterpret old particle-broadband buffers as titanium alloy. Verify copied saves in the target game; release acceptance remains unexecuted.

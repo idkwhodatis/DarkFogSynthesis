@@ -27,6 +27,7 @@ namespace DarkFogSynthesis.Core.Definitions
             public static readonly ItemId TitaniumGlass = new ItemId(1119);
             public static readonly ItemId MicrocrystallineComponent = new ItemId(1302);
             public static readonly ItemId ParticleBroadband = new ItemId(1402);
+            public static readonly ItemId TitaniumAlloy = new ItemId(1107);
             public static readonly ItemId PlaneFilter = new ItemId(1304);
             public static readonly ItemId SuperMagneticRing = new ItemId(1205);
             public static readonly ItemId Hydrogen = new ItemId(1120);

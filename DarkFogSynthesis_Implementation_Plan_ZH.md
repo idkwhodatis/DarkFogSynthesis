@@ -46,7 +46,7 @@
 |---|---|---|---:|---:|---|
 | `energy_shard` | 能量碎片 | 燃烧单元 ×1；高能石墨 ×1；玻璃 ×1 | 2 | 2 秒 | 熔炉 |
 | `dark_fog_matrix` | 黑雾矩阵 | 晶格硅 ×2；光子合并器 ×1；电浆激发器 ×1；钛化玻璃 ×1 | 1 | 4 秒 | 矩阵研究站 |
-| `silicon_neuron` | 硅基神经元 | 微晶元件 ×2；粒子宽带 ×1；晶格硅 ×2 | 1 | 4 秒 | 制造台 |
+| `silicon_neuron` | 硅基神经元 | 微晶元件 ×2；钛合金 ×2；晶格硅 ×2 | 1 | 4 秒 | 制造台 |
 | `matter_recombinator` | 物质重组器 | 位面过滤器 ×1；超级磁场环 ×2；氢 ×2；晶格硅 ×2 | 1 | 6 秒 | 制造台 |
 | `negentropy_singularity` | 负熵奇点 | 奇异物质 ×1；卡西米尔晶体 ×2；氘核燃料棒 ×1；晶格硅 ×2 | 1 | 8 秒 | 制造台 |
 | `core_element` | 核心素 | 反物质 ×2；框架材料 ×2；超级磁场环 ×2；晶格硅 ×4 | 1 | 10 秒 | 制造台 |
@@ -690,3 +690,11 @@ CommonAPI 所检查的缺失内容清理实现针对自定义机器，并不是�
 - [ModProtoHistory.cs](https://github.com/limoka/CommonAPI/blob/master/CommonAPI/Systems/ProtoRegistrySystem/ModProtoHistory.cs)
 - 本次读取文件 Blob SHA：`bee8e6b30704c2db3177404e0662a8952a92235b`。
 - 核对项：Mod 自定义机器记录与缺失机器移除；不能当作所有自定义科技/配方引用的卸载保证。
+
+## Approved Silicon Neuron recipe revision / 已批准的配方修改
+
+Silicon Neuron now requires Microcrystalline Component ×2, Titanium Alloy ×2, and Crystal Silicon ×2. Output (one), recipe ID 48103, unlock technology 1312 and 240-tick base time are unchanged.
+
+硅基神经元：微晶元件 ×2；钛合金 ×2；晶格硅 ×2。此修改覆盖原计划中的粒子宽带 ×1。
+
+**Experimental-save upgrade boundary:** no migration of buffered/in-flight material from the previous ingredient layout is claimed. Before upgrading, use the old build to drain/reset Silicon Neuron machines and finish/cancel related handcraft jobs, then retain an untouched backup. New ingredients are not a license to reinterpret old particle-broadband buffers as titanium alloy. Verify copied saves in the target game; release acceptance remains unexecuted.
