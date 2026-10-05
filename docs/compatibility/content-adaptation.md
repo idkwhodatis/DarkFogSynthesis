@@ -17,3 +17,9 @@ The explicit recipe revision supersedes only Silicon Neuron's Particle Broadband
 Use the existing CommonAPI/LDBTool registration and native research engine. No new scientific matrix, save sidecar, blanket cache reset, automatic unlock, full refund operation or release approval. Prior compile-baseline reports describe their historical build, not the new runtime.
 
 The source-comparison rationale and pinned upstream revisions remain in [mod-source-comparison.md](mod-source-comparison.md). This document tracks implementation, not target-game acceptance.
+
+## Patch A implemented
+
+`ContentPreparation` is the shared production preparation routine, not a lifecycle controller. It resolves both technology icons before allocating a tab, checks all six slots after allocation, and supplies detached per-attempt mutable arrays. `ContentRegistry` validates the icon accessor before entering that routine and queues prototypes only after it returns. Existing binding, ownership, collision and startup failure policies remain in force. Failed image decoding disposes the newly allocated texture.
+
+Core regression coverage injects a second-icon failure, final-slot collision, overflow and invalid tabs, and verifies array isolation across definitions and repeated attempts. These tests exercise production Core preparation; they do not execute LDBTool or Unity registration.

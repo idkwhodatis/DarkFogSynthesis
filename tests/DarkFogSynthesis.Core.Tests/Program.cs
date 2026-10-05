@@ -21,6 +21,8 @@ namespace DarkFogSynthesis.Core.Tests
             var tests = new (string Name, Action Run)[]
             {
                 ("D01 exact six frozen recipes", FrozenRecipes),
+                ("A01 complete native registration preparation before queueing",
+                    () => ContentPreparationTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("D02 fixed namespace and content counts", FixedIds),
                 ("D04 ideal base rates", BaseRates),
                 ("T01 frozen research totals and independent branches", FrozenTechnologies),

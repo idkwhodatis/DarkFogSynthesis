@@ -59,37 +59,43 @@ namespace DarkFogSynthesis.Registration
                 Require(TechLayoutResolver.FindMainTreeAnchorCollisions(node.Tech, node.Position, knownTechAnchors).Count == 0,
                     "Candidate technology position is occupied by a current or pending main-page node; do not move vanilla nodes. ID " + node.Tech);
 
+            var iconField = AccessTools.Field(typeof(TechProto), "_iconSprite")
+                ?? throw new InvalidOperationException("Unsupported technology icon cache.");
+            Require(iconField.FieldType == typeof(Sprite) && !iconField.IsInitOnly && !iconField.IsStatic,
+                "Technology icon cache cannot be assigned safely.");
             using (ProtoRegistry.StartModLoad(Plugin.Guid))
             {
-                int tab = TabSystem.RegisterTab(Plugin.Guid + ".recipes", new TabData(
-                    ProtoIds.StringKey("recipes.tab"), LDB.items.Select(VanillaIds.Items.DarkFogMatrix.Value).IconPath));
-                int column = 1;
-                foreach (var definition in FrozenContent.Technologies)
+                // Asset resolution, detached argument arrays and every assigned slot are prepared
+                // before the first custom prototype is queued. Tab allocation itself is not transactional.
+                var prepared = ContentPreparation.Prepare(
+                    definition => Localization.Strings.LoadIcon(definition.Key == "energy_analysis" ? "energy-analysis" : "information-topology"),
+                    () => TabSystem.RegisterTab(Plugin.Guid + ".recipes", new TabData(
+                        ProtoIds.StringKey("recipes.tab"), LDB.items.Select(VanillaIds.Items.DarkFogMatrix.Value).IconPath)),
+                    grid => Require(!PendingPrototypes().OfType<RecipeProto>().Concat(LDB.recipes.dataArray)
+                        .Any(p => p != null && p.GridIndex == grid), "Recipe selector grid collision: " + grid));
+                foreach (var arguments in prepared.Technologies)
                 {
+                    var definition = arguments.Definition;
                     var position = layout.Candidates.Single(p => p.Tech == definition.Id).Position;
                     TechProto tech = ProtoRegistry.RegisterTech(definition.Id.Value, definition.NameKey,
                         definition.DescriptionKey, definition.ConclusionKey, "",
-                        definition.ExplicitPrerequisites.Select(p => p.Value).ToArray(),
-                        definition.ResearchCost.Select(p => p.Item.Value).ToArray(), definition.CandidateItemPoints.ToArray(),
-                        definition.HashNeeded, definition.UnlockRecipes.Select(p => p.Value).ToArray(), new Vector2(position.X, position.Y));
+                        arguments.Prerequisites, arguments.ResearchItems, arguments.ItemPoints,
+                        definition.HashNeeded, arguments.UnlockRecipes, new Vector2(position.X, position.Y));
                     Require(tech.ID == definition.Id.Value, "LDBTool changed a stable technology ID. Restore its default CustomID entry; migration is not supported.");
-                    tech.PreTechsImplicit = definition.ImplicitPrerequisites.Select(p => p.Value).ToArray();
+                    tech.PreTechsImplicit = arguments.ImplicitPrerequisites;
                     tech.Level = 0;
                     tech.MaxLevel = 0;
                     tech.IsHiddenTech = false;
-                    AccessTools.Field(typeof(TechProto), "_iconSprite").SetValue(tech,
-                        Localization.Strings.LoadIcon(definition.Key == "energy_analysis" ? "energy-analysis" : "information-topology"));
+                    iconField.SetValue(tech, arguments.Icon);
                     technologies.Add(definition.Id.Value, tech);
                 }
-                foreach (var definition in FrozenContent.Recipes)
+                foreach (var arguments in prepared.Recipes)
                 {
-                    int grid = tab * 1000 + 100 + column++;
-                    Require(!pending.OfType<RecipeProto>().Concat(LDB.recipes.dataArray).Any(p => p.GridIndex == grid),
-                        "Recipe selector grid collision: " + grid);
+                    var definition = arguments.Definition;
+                    int grid = arguments.GridIndex;
                     RecipeProto recipe = ProtoRegistry.RegisterRecipe(definition.Id.Value, RecipeType(definition.Machine),
-                        definition.TimeSpendTicks, definition.Inputs.Select(p => p.Item.Value).ToArray(),
-                        definition.Inputs.Select(p => p.Count).ToArray(), new[] { definition.Output.Item.Value },
-                        new[] { definition.Output.Count }, ProtoIds.StringKey("recipe." + definition.Key + ".description"),
+                        definition.TimeSpendTicks, arguments.Items, arguments.ItemCounts, arguments.Results,
+                        arguments.ResultCounts, ProtoIds.StringKey("recipe." + definition.Key + ".description"),
                         definition.UnlockTech.Value, grid, definition.NameKey, LDB.items.Select(definition.Output.Item.Value).IconPath);
                     Require(recipe.ID == definition.Id.Value && recipe.GridIndex == grid,
                         "LDBTool changed a stable recipe ID or occupied selector slot. Restore its default CustomID/CustomGridIndex entry.");

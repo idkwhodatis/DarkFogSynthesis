@@ -28,12 +28,21 @@ namespace DarkFogSynthesis.Localization
         {
             if (sprites.TryGetValue(name, out var existing)) return existing;
             string path = Path.Combine(Path.GetDirectoryName(typeof(Plugin).Assembly.Location)!, "assets", name + ".png");
+            // Read before allocating a Unity object. A bad second icon must not leak its texture
+            // when whole-batch preparation fails before registration.
+            byte[] bytes = File.ReadAllBytes(path);
             var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            if (!ImageConversion.LoadImage(texture, File.ReadAllBytes(path), false)) throw new InvalidDataException("Invalid icon: " + name);
-            texture.name = Plugin.Guid + "." + name;
-            texture.filterMode = FilterMode.Bilinear;
-            texture.wrapMode = TextureWrapMode.Clamp;
-            var sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.5f, .5f), 100f);
+            Sprite sprite;
+            try
+            {
+                if (!ImageConversion.LoadImage(texture, bytes, false)) throw new InvalidDataException("Invalid icon: " + name);
+                texture.name = Plugin.Guid + "." + name;
+                texture.filterMode = FilterMode.Bilinear;
+                texture.wrapMode = TextureWrapMode.Clamp;
+                sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.5f, .5f), 100f);
+                if (sprite == null) throw new InvalidDataException("Unable to create icon: " + name);
+            }
+            catch { UnityEngine.Object.Destroy(texture); throw; }
             assets.Add(texture); assets.Add(sprite);
             sprites.Add(name, sprite);
             return sprite;
