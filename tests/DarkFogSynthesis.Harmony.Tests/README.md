@@ -3,7 +3,7 @@
 This executable patches harmless `NoInlining` fixture methods with **real HarmonyX
 2.7.0**, then routes finalizers and save prefixes through the production Core
 `SessionBeginCompletion`, `SessionCompatibilityState`, and
-`SessionPersistencePolicy` implementations.
+`SessionPersistencePolicy` and `MaintenanceSessionGuard` implementations.
 
 It loads no DSP, Unity, or BepInEx assembly, writes no save file, and contains no game
 type stubs. The fixture's quarantine identity is an observable completion callback
@@ -58,6 +58,15 @@ No runtime or package binaries are checked in.
 - A blocked identity cannot reset itself; a different fully validated identity can
 - Maintenance exceptions require an exact, ordinal named-save match and never
   bypass pending validation, compatibility failure, or incomplete startup
+- A permitted backup callback cannot resume maintenance before quarantine exists
+- Direct callback changes to pause, session/history/player, loading or validation
+  refuse the next cleanup boundary; no actual native cleanup is simulated
+- Failed-preflight restoration is scoped to the original valid session after the
+  maintenance barrier clears; ordinary Begin still permits resume while saves wait
+- A validated replacement during maintenance cannot clear quarantine; a later
+  validated replacement outside maintenance can
+- A higher-priority foreign Resume prefix cannot redirect automatic restoration
+  to a replacement session; exceptions preserve identity and clear the temporary scope
 
 ## Pinned Harmony injection details
 

@@ -87,6 +87,8 @@ Peace Mode always adds the four agreed combat prerequisites to the four vanilla 
 
 [Checkout and compiler-inventory review](docs/compatibility/build-input-review.md): SVG bytes remain stable under Git newline conversion, and newly added production files require recompilation before an old DLL can be recorded or packaged against their source inventory.
 
+[Design-time and maintenance review](docs/compatibility/design-time-maintenance-review.md): editor-only compilation preserves valid build records, and removal maintenance blocks resume across backup callbacks while checking ownership of the paused session.
+
 **Do not assume deleting the DLL is safe.** Active machines, research/crafting queues and blueprints may retain custom IDs. A fully validated “Prepare a Vanilla-Compatible Save” operation is not currently established. Retain or restore the untouched pre-Mod backup for ordinary play; do not overwrite it with experimental saves. 不能将“产物全是原版物品”视为安全卸载证明。
 
 Original editable art and generated PNGs are covered by the [MIT license](LICENSE); see [asset provenance](assets/README.md). No game or framework binaries are distributed.

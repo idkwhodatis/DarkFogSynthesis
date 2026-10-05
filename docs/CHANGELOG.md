@@ -64,3 +64,11 @@ No target-game production, discovery, save migration, cleanup, achievement, Meta
 - Forced actual compilation for each new capture, rejecting preserved-timestamp skipped builds, explicit compiler skipping and unsupported source layouts
 - Added real Core-build and full reference-build mutation/recovery regressions, plus Linux/Windows CI coverage for the new tooling
 - Local verification: 76 pure tests (17,471 assertions), 16 real-Harmony cases (264 assertions), 64 packaging tests, 3 checkout tests, 30 real Core-build assertions, 15 resource-audit self-tests, clean reference compile and metadata audits; native Windows results are reported by CI and game acceptance remains unexecuted
+
+### Design-time and maintenance follow-up — 2026-10-05
+
+- Excluded design-time evaluation and compiler/completion targets from provenance writes while retaining actual compiler arguments and ordinary skipped-build refusal
+- Blocked Resume throughout maintenance, including backup callbacks before quarantine; verified captured session/history/player, pause and validation at callback/mutation/rollback boundaries
+- Kept quarantine through active-maintenance replacement callbacks; scoped failed-preflight resume to the captured session and rechecked it at the native prefix
+- Preserved exact named maintenance save permits and normal pending-Begin resume behavior
+- Verification: 77 pure tests (18,349 assertions), 22 real-Harmony cases (333 assertions), 64 packaging tests, 3 checkout cases, 56 genuine Core-build assertions, 15 resource-audit self-tests, clean reference build and metadata audits; no Visual Studio UI or DSP game execution

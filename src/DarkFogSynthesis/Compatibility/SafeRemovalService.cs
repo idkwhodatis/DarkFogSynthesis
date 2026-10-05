@@ -25,9 +25,10 @@ namespace DarkFogSynthesis.Compatibility
         private static GameData? quarantinedSession;
         // Keep the quarantine global while a replacement is loading or has failed; merely replacing
         // GameMain.data is not proof that the next session passed all validation.
-        internal static bool IsQuarantined => quarantinedSession != null;
+        internal static bool IsQuarantined { get { lock (SaveGate) return quarantinedSession != null; } }
         private static readonly object SaveGate = new object();
         [ThreadStatic] private static string? permittedSaveName;
+        [ThreadStatic] private static MaintenanceSessionGuard? restoringPreflightSession;
 
         private static class SaveWriteGuard
         {
@@ -88,14 +89,26 @@ namespace DarkFogSynthesis.Compatibility
         private static class ResumeGuard
         {
             [HarmonyPrefix]
-            private static bool BeforeResume() => !IsQuarantined &&
-                Plugin.Instance != null && !Plugin.Instance.IsResumeBlocked;
+            private static bool BeforeResume()
+            {
+                lock (SaveGate)
+                {
+                    if (!MaintenanceSessionGuard.AllowsResume(Plugin.Instance != null && !Plugin.Instance.IsResumeBlocked,
+                        cleaning, quarantinedSession != null)) return false;
+                    // A foreign prefix may replace the session after the restoration decision but
+                    // before this native entry. Ordinary Resume retains its weaker Begin semantics.
+                    var current = GameMain.data;
+                    return restoringPreflightSession == null || restoringPreflightSession.CanRestoreRunningSession(current,
+                        current?.history, current?.mainPlayer, GameMain.isLoading, HasCurrentValidatedPlayer(current));
+                }
+            }
         }
 
         internal static void OnNewSession(GameData data)
         {
             // Called only after the replacement's native Begin and late compatibility checks succeed.
-            if (quarantinedSession != null && !ReferenceEquals(quarantinedSession, data)) quarantinedSession = null;
+            lock (SaveGate)
+                if (MaintenanceSessionGuard.CanReleaseQuarantineAfterValidation(cleaning, quarantinedSession, data)) quarantinedSession = null;
         }
 
         internal static string Preview()
@@ -124,38 +137,48 @@ namespace DarkFogSynthesis.Compatibility
         internal static string PrepareCandidate()
         {
             Plugin.Instance.EnsureReady();
+            GameData data;
+            GameHistoryData history;
+            MaintenanceSessionGuard session;
             lock (SaveGate)
             {
                 if (cleaning || quarantinedSession != null || writesInProgress != 0 || GameMain.isLoading || GameMain.data == null || GameMain.mainPlayer == null)
                     throw new InvalidOperationException("A game must be loaded, with no other save or maintenance operation in progress.");
+                data = GameMain.data;
+                history = data.history;
+                session = new MaintenanceSessionGuard(data, history, data.mainPlayer, GameMain.isPaused);
                 cleaning = true;
             }
-            bool pausedBefore = GameMain.isPaused;
             bool succeeded = false;
-            var data = GameMain.data;
-            var history = data.history;
             var rollback = new List<Action>();
             string? backupName = null;
             string? candidateName = null;
             try
             {
                 GameMain.Pause();
-                if (!GameMain.isPaused) throw new InvalidOperationException("The simulation could not be paused.");
+                RequirePausedSession(session);
                 var scan = Scan(data, false);
                 if (scan.Blockers.Count != 0) throw new InvalidOperationException(string.Join("; ", scan.Blockers));
                 string token = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + System.Guid.NewGuid().ToString("N").Substring(0, 8);
                 backupName = "DFS-backup-" + token;
                 candidateName = "DFS-removal-candidate-" + token;
                 if (GameSave.SaveExist(backupName) || GameSave.SaveExist(candidateName)) throw new IOException("Unique maintenance save name already exists.");
-                SaveNewAndVerify(backupName); // First durable copy: nothing has been removed yet.
+                SaveNewAndVerify(backupName, session); // First durable copy: nothing has been removed yet.
+                RequirePausedSession(session);
                 // Recheck after all native save callbacks. No writes start if inventory or references changed.
                 var secondScan = Scan(data, false);
                 if (secondScan.Blockers.Count != 0 || !scan.SameTargets(secondScan))
                     throw new InvalidOperationException("State changed while the backup was created. Backup is retained; no cleanup was performed.");
+                RequirePausedSession(session);
 
                 var originalRecipes = new HashSet<int>(history.recipeUnlocked);
                 var originalTechs = new Dictionary<int, TechState>(history.techStates);
                 var originalQueue = (int[])history.techQueue.Clone();
+                lock (SaveGate)
+                {
+                    RequirePausedSession(session);
+                    quarantinedSession = data;
+                }
                 rollback.Add(() =>
                 {
                     // Restore only our IDs. Never replace shared collections or undo another mod's unrelated writes.
@@ -164,39 +187,45 @@ namespace DarkFogSynthesis.Compatibility
                     foreach (int tech in Technologies)
                         if (originalTechs.TryGetValue(tech, out var state)) history.techStates[tech] = state; else history.techStates.Remove(tech);
                 });
-                quarantinedSession = data;
-
                 foreach (var target in scan.Assemblers)
                 {
+                    RequirePausedSession(session);
                     var factory = target.Item1; int index = target.Item2;
                     var component = factory.factorySystem.assemblerPool[index];
                     int entity = component.entityId;
                     var sign = factory.entitySignPool[entity];
                     byte[] bytes = Serialize(w => component.Export(w));
+                    RequirePausedSession(session);
                     rollback.Add(() =>
                     {
                         if (factory.factorySystem.assemblerPool[index].id != component.id || factory.factorySystem.assemblerPool[index].entityId != entity)
                             throw new InvalidOperationException("An assembler was replaced during cleanup; refusing to overwrite a different entity.");
                         using (var reader = new BinaryReader(new MemoryStream(bytes))) factory.factorySystem.assemblerPool[index].Import(reader);
+                        RequirePausedSession(session);
                         factory.entitySignPool[entity] = sign;
                     });
                     factory.factorySystem.assemblerPool[index].SetRecipe(0, factory.entitySignPool);
+                    RequirePausedSession(session);
                 }
                 foreach (var target in scan.Labs)
                 {
+                    RequirePausedSession(session);
                     var factory = target.Item1; int index = target.Item2;
                     var component = factory.factorySystem.labPool[index];
                     int entity = component.entityId;
                     var sign = factory.entitySignPool[entity];
                     byte[] bytes = Serialize(w => component.Export(w));
+                    RequirePausedSession(session);
                     rollback.Add(() =>
                     {
                         if (factory.factorySystem.labPool[index].id != component.id || factory.factorySystem.labPool[index].entityId != entity)
                             throw new InvalidOperationException("A lab was replaced during cleanup; refusing to overwrite a different entity.");
                         using (var reader = new BinaryReader(new MemoryStream(bytes))) factory.factorySystem.labPool[index].Import(reader);
+                        RequirePausedSession(session);
                         factory.entitySignPool[entity] = sign;
                     });
                     factory.factorySystem.labPool[index].SetFunction(false, 0, 0, factory.entitySignPool);
+                    RequirePausedSession(session);
                 }
                 // Queued/current custom research was rejected in preflight. Do not invoke queue APIs whose
                 // current-tech/mecha cache side effects cannot yet be safely rolled back on this target.
@@ -214,7 +243,9 @@ namespace DarkFogSynthesis.Compatibility
                 var expectedQueue = originalQueue.Where(id => id != 0 && !Technologies.Contains(id)).ToArray();
                 if (!history.techQueue.Where(id => id != 0).SequenceEqual(expectedQueue))
                     throw new InvalidOperationException("Unrelated research queue entries changed; cleanup is being rolled back.");
-                SaveNewAndVerify(candidateName);
+                RequirePausedSession(session);
+                SaveNewAndVerify(candidateName, session);
+                RequirePausedSession(session);
                 var afterSave = Scan(data, true);
                 if (afterSave.Blockers.Count != 0 || afterSave.Assemblers.Count != 0 || afterSave.Labs.Count != 0)
                     throw new InvalidOperationException("Native save callbacks reintroduced known custom references. The candidate is not accepted.");
@@ -228,6 +259,7 @@ namespace DarkFogSynthesis.Compatibility
                     inventoryHandling = "All affected buffers were empty; no item refunds, gifts or inventory edits were performed.",
                     externalBlueprints = "Not read or changed; copied external blueprints containing custom recipe IDs must not be reused without cleanup."
                 }));
+                RequirePausedSession(session);
                 succeeded = true;
                 return "Created " + backupName + " and " + candidateName + ". This is an UNVERIFIED removal candidate, not a certified vanilla-compatible save. Quit the game now; test the candidate in a separate vanilla profile. Keep the backup. Simulation remains paused.";
             }
@@ -235,7 +267,13 @@ namespace DarkFogSynthesis.Compatibility
             {
                 var errors = new List<Exception>();
                 for (int i = rollback.Count - 1; i >= 0; --i)
+                {
+                    // Do not invoke native rollback callbacks against a replaced or running session.
+                    try { RequirePausedSession(session); } catch (Exception error) { errors.Add(error); break; }
                     try { rollback[i](); } catch (Exception error) { errors.Add(error); }
+                }
+                if (rollback.Count != 0 && errors.Count == 0)
+                    try { RequirePausedSession(session); } catch (Exception error) { errors.Add(error); }
                 if (errors.Count != 0) throw new AggregateException("Cleanup failed and in-memory rollback was incomplete. Keep the game paused and reload backup " + backupName + ". Never overwrite the original.", new[] { original }.Concat(errors));
                 if (rollback.Count != 0)
                     throw new InvalidOperationException("Cleanup failed; in-memory changes were restored and the game remains paused. Reload the backup before continuing. Backup: " + backupName + "; candidate (if created, do not treat as successful): " + candidateName + ". " + original.Message, original);
@@ -243,9 +281,36 @@ namespace DarkFogSynthesis.Compatibility
             }
             finally
             {
-                lock (SaveGate) cleaning = false;
-                // Failed preflight does not leave a formerly running game paused. Successful candidates must be exited.
-                if (!succeeded && rollback.Count == 0 && !pausedBefore) GameMain.Resume();
+                bool restoreRunning;
+                lock (SaveGate)
+                {
+                    cleaning = false;
+                    // Restore a failed preflight only for the same still-valid session, after the
+                    // maintenance barrier is down. Never resume a replacement or pending load.
+                    var current = GameMain.data;
+                    restoreRunning = !succeeded && rollback.Count == 0 && session.CanRestoreRunningSession(current, current?.history,
+                        current?.mainPlayer, GameMain.isLoading, HasCurrentValidatedPlayer(current));
+                }
+                if (restoreRunning)
+                {
+                    var previous = restoringPreflightSession;
+                    restoringPreflightSession = session;
+                    try { GameMain.Resume(); }
+                    finally { restoringPreflightSession = previous; }
+                }
+            }
+        }
+
+        private static bool HasCurrentValidatedPlayer(GameData? data) => Plugin.Instance != null &&
+            !Plugin.Instance.IsPersistenceBlocked && ReferenceEquals(GameMain.mainPlayer, data?.mainPlayer);
+
+        private static void RequirePausedSession(MaintenanceSessionGuard session)
+        {
+            lock (SaveGate)
+            {
+                var current = GameMain.data;
+                session.EnsurePausedSession(current, current?.history, current?.mainPlayer,
+                    GameMain.isPaused, GameMain.isLoading, HasCurrentValidatedPlayer(current));
             }
         }
 
@@ -307,12 +372,15 @@ namespace DarkFogSynthesis.Compatibility
         {
             using (var stream = new MemoryStream()) { using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true)) export(writer); return stream.ToArray(); }
         }
-        private static void SaveNewAndVerify(string name)
+        private static void SaveNewAndVerify(string name, MaintenanceSessionGuard session)
         {
+            RequirePausedSession(session);
             if (GameSave.SaveExist(name)) throw new IOException("Refusing to overwrite a save: " + name);
+            RequirePausedSession(session);
             permittedSaveName = name;
             try { if (!GameSave.SaveCurrentGame(name)) throw new IOException("Native save creation failed: " + name); }
             finally { permittedSaveName = null; }
+            RequirePausedSession(session);
             var file = new FileInfo(GameSave.SavePath(name));
             if (!file.Exists || file.Length == 0) throw new IOException("Native save did not produce a nonempty file: " + name);
         }

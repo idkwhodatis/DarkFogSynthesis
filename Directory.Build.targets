@@ -3,7 +3,10 @@
        These local sidecars are not distributed: public reports contain hashes
        and metadata identities without private installation paths. All tasks are
        supplied by MSBuild; no game/dependency assembly is executed. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'DarkFogSynthesis' Or '$(MSBuildProjectName)' == 'DarkFogSynthesis.Core'">
+  <!-- Design-time compilation only supplies IDE inputs. It must neither create
+       nor invalidate the provenance of a real build. Keep capture-only work
+       out of evaluation as well as both capture target execution paths. -->
+  <PropertyGroup Condition="'$(DesignTimeBuild)' != 'true' And ('$(MSBuildProjectName)' == 'DarkFogSynthesis' Or '$(MSBuildProjectName)' == 'DarkFogSynthesis.Core')">
     <DarkFogCaptureBuild>true</DarkFogCaptureBuild>
     <DarkFogReferenceMode Condition="'$(DarkFogReferenceMode)' == ''">installed-local</DarkFogReferenceMode>
     <!-- Keep inventory membership in sync with package.py production_inventory.
@@ -16,7 +19,7 @@
   <!-- Default Compile/resource globs are evaluated before target execution.
        A new file appearing only at compiler entry must not be certified as if
        it had belonged to those earlier evaluated items. -->
-  <ItemGroup Condition="'$(DarkFogCaptureBuild)' == 'true'">
+  <ItemGroup Condition="'$(DarkFogCaptureBuild)' == 'true' And '$(DesignTimeBuild)' != 'true'">
     <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)global.json" Condition="Exists('$(MSBuildThisFileDirectory)global.json')" />
     <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)manifest.json" Condition="Exists('$(MSBuildThisFileDirectory)manifest.json')" />
     <_DarkFogEvaluatedInventoryRoots Include="$(MSBuildThisFileDirectory)icon.png" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
@@ -26,7 +29,7 @@
     <_DarkFogEvaluatedInventory Include="$(_DarkFogInventoryIncludes);@(_DarkFogEvaluatedInventoryRoots)" Exclude="$(_DarkFogInventoryExcludes)" />
     <_DarkFogEvaluatedInventory Include="$(_DarkFogImportIncludes)" Exclude="$(_DarkFogImportExcludes)" />
   </ItemGroup>
-  <Target Name="CaptureDarkFogCompilerInputs" BeforeTargets="CoreCompile" DependsOnTargets="FindReferenceAssembliesForReferences" Condition="'$(DarkFogCaptureBuild)' == 'true'">
+  <Target Name="CaptureDarkFogCompilerInputs" BeforeTargets="CoreCompile" DependsOnTargets="FindReferenceAssembliesForReferences" Condition="'$(DarkFogCaptureBuild)' == 'true' And '$(DesignTimeBuild)' != 'true'">
     <PropertyGroup>
       <_DarkFogInvocation>$([System.Guid]::NewGuid().ToString('D'))</_DarkFogInvocation>
       <_DarkFogProvenance>$(TargetDir)$(TargetName).build-inputs.txt</_DarkFogProvenance>
@@ -34,7 +37,7 @@
     <MakeDir Directories="$(TargetDir)" />
     <!-- Invalidate old success before any capture operation can fail. -->
     <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="schema|2;invocation|$(_DarkFogInvocation);project|$(MSBuildProjectName);configuration|$(Configuration);referenceMode|$(DarkFogReferenceMode);targetFramework|$(TargetFramework);sdk|$(NETCoreSdkVersion);msbuild|$(MSBuildVersion)" Overwrite="true" Encoding="UTF-8" />
-    <Error Condition="'$(SkipCompilerExecution)' == 'true' Or '$(DesignTimeBuild)' == 'true'" Text="A compiler provenance capture requires actual compilation, not SkipCompilerExecution or a design-time build." />
+    <Error Condition="'$(SkipCompilerExecution)' == 'true'" Text="A compiler provenance capture requires actual compilation, not SkipCompilerExecution." />
     <ItemGroup>
       <!-- A capture is a new compiler invocation, not an incremental timestamp
            assertion. This SDK-supported, invocation-unique missing output makes
@@ -90,7 +93,7 @@
     </GetFileHash>
     <WriteLinesToFile File="$(_DarkFogProvenance)" Lines="@(_DarkFogHashedReferences->'reference|%(FullPath)|%(AssemblyIdentity)|%(FileHash)');@(_DarkFogHashedInputs->'input|%(FullPath)|%(FileHash)');@(_DarkFogHashedCompile->'compile|%(FullPath)|%(FileHash)');@(_DarkFogHashedResources->'resource|%(FullPath)|%(FileHash)');@(_DarkFogHashedGenerated->'generated|%(FullPath)|%(FileHash)');@(_DarkFogHashedInventory->'inventory|%(FullPath)|%(FileHash)')" Encoding="UTF-8" />
   </Target>
-  <Target Name="CompleteDarkFogBuildCapture" AfterTargets="Build" Condition="'$(DarkFogCaptureBuild)' == 'true' And '$(_DarkFogInvocation)' != ''">
+  <Target Name="CompleteDarkFogBuildCapture" AfterTargets="Build" Condition="'$(DarkFogCaptureBuild)' == 'true' And '$(DesignTimeBuild)' != 'true' And '$(_DarkFogInvocation)' != ''">
     <!-- Re-evaluate globs: hashing only the previously captured paths would
          miss additions during the build, which is the original stale-source bug. -->
     <ItemGroup>

@@ -45,6 +45,8 @@ namespace DarkFogSynthesis.Core.Tests
                     () => SessionFailureBoundaryTests.NativeMutationFailures((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("S06 persistence requires a validated identity and Begin completion requires the original",
                     () => SessionPersistenceTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
+                ("U03 maintenance owns a paused validated session and blocks Resume before quarantine",
+                    () => MaintenanceSessionGuardTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("C01 live progression validates required edges, caches and technology availability",
                     () => LiveProgressionPolicyTests.Run((condition,message) => { assertions++; if (!condition) throw new Exception(message); })),
                 ("C01 critical startup entrypoints stay closed through initialization failures",

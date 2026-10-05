@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -38,19 +39,50 @@ def run(dotnet: str) -> None:
             if not condition:
                 raise AssertionError(message)
 
-        def build(*, failure: str | None = None, extra: tuple[str, ...] = ()) -> None:
+        def build(*, failure: str | None = None, extra: tuple[str, ...] = ()) -> str:
             result = subprocess.run(
                 [dotnet, "build", str(project / "DarkFogSynthesis.Core.csproj"),
                  "--configuration", "Release", "--nologo",
                  "-p:DarkFogReferenceMode=reference-assembly-smoke", *extra],
                 cwd=root, capture_output=True, text=True, timeout=600,
-                env={**os.environ, "DOTNET_CLI_TELEMETRY_OPTOUT": "1"})
+                env={**os.environ, "DOTNET_CLI_TELEMETRY_OPTOUT": "1", "DOTNET_NOLOGO": "1"})
             log = result.stdout + result.stderr
             if failure is None:
                 check(result.returncode == 0, "Real Core build failed:\n" + log)
             else:
                 check(result.returncode != 0 and failure in log,
                       "Expected compiler refusal was not observed:\n" + log)
+            return log
+
+        def design_time_compile(*, explicit_capture: bool = False) -> None:
+            # Exercise the SDK's compiler-command-line path, without launching
+            # an IDE. Its standard IDE properties force Csc to return arguments
+            # even when a previous real build is already up to date.
+            extra = ("-p:DarkFogCaptureBuild=true",) if explicit_capture else ()
+            result = json.loads(build(extra=(
+                "-target:Compile", "-verbosity:quiet",
+                "-p:DesignTimeBuild=true", "-p:SkipCompilerExecution=true",
+                "-p:ProvideCommandLineArgs=true", "-p:BuildingInsideVisualStudio=true",
+                "-p:BuildingProject=false",
+                "-getProperty:DarkFogCaptureBuild,_DarkFogInvocation,_DarkFogInventoryIncludes",
+                "-getItem:_DarkFogEvaluatedInventory,CustomAdditionalCompileOutputs,CscCommandLineArgs",
+                *extra)))
+            properties, items = result["Properties"], result["Items"]
+            check(properties["DarkFogCaptureBuild"] == ("true" if explicit_capture else ""),
+                  "Design-time evaluation unexpectedly enabled capture")
+            check(properties["_DarkFogInvocation"] == "",
+                  "Design-time compilation started a capture invocation")
+            check(properties["_DarkFogInventoryIncludes"] == ""
+                  and items["_DarkFogEvaluatedInventory"] == [],
+                  "Design-time evaluation included capture-only inventory")
+            check(items["CustomAdditionalCompileOutputs"] == [],
+                  "Design-time compilation added capture-only compiler outputs")
+            check(bool(items["CscCommandLineArgs"]),
+                  "Design-time compilation did not return actual Csc arguments")
+
+        def output_snapshot():
+            return {path.relative_to(project): (path.read_bytes(), path.stat().st_mtime_ns)
+                    for path in (project / "bin").rglob("*") if path.is_file()}
 
         def validate():
             inventory = package.production_inventory()
@@ -78,11 +110,26 @@ def run(dotnet: str) -> None:
 
         try:
             package.ROOT = root
+            design_time_compile()
+            check(not sidecar.exists(), "Initial design-time compilation created a capture")
+            check(not output.exists(), "Initial design-time compilation emitted a DLL")
             build()
             validate()
             check(output.is_file(), "Core DLL missing after actual build")
             baseline_dll = hashlib.sha256(output.read_bytes()).hexdigest()
             baseline_capture = sidecar.read_bytes()
+
+            # Both ordinary design-time use and an explicitly inherited capture
+            # property must leave the previous candidate completely untouched.
+            baseline_outputs = output_snapshot()
+            baseline_paths = {path.relative_to(root) for path in root.rglob("*") if path.is_file()}
+            for explicit_capture in (False, True):
+                design_time_compile(explicit_capture=explicit_capture)
+                check(output_snapshot() == baseline_outputs,
+                      "Design-time compilation changed candidate outputs or timestamps")
+                check({path.relative_to(root) for path in root.rglob("*") if path.is_file()}
+                      == baseline_paths, "Design-time compilation added or removed files")
+                validate()
 
             # Deliberately uncompilable and default-included. No build occurs
             # between adding it and asking the production validator to qualify
@@ -146,7 +193,15 @@ def run(dotnet: str) -> None:
                 build()
                 validate()
 
-            build(failure="SkipCompilerExecution", extra=("-p:SkipCompilerExecution=true",))
+            before_skip_dll = output.read_bytes()
+            before_skip_capture = sidecar.read_bytes()
+            build(failure="SkipCompilerExecution", extra=(
+                "-p:SkipCompilerExecution=true", "-p:DesignTimeBuild=false"))
+            check(output.read_bytes() == before_skip_dll,
+                  "Explicit compiler skipping changed the previous DLL")
+            check(sidecar.read_bytes() != before_skip_capture
+                  and b"completed|" not in sidecar.read_bytes(),
+                  "Explicit compiler skipping did not invalidate attempted provenance")
             refusal("explicitly skipped compiler execution")
             build()
             validate()
@@ -172,7 +227,7 @@ def run(dotnet: str) -> None:
             marker.write_bytes(saved)
             validate()
             print(f"PASS: genuine Core build/capture regression, {assertions} assertions; "
-                  "uncompiled additions, compiler failure/recovery, preserved timestamps, "
+                  "design-time isolation, uncompiled additions, compiler failure/recovery, preserved timestamps, "
                   "build-window mutations, skipped compiler, resources/imports, rename/delete.")
             print("Scope: isolated real Core compilation and production metadata guards; no DSP, plugin execution or saves.")
         finally:

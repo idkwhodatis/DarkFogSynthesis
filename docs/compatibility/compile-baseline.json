@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedDate": "2026-10-04",
+  "recordedDate": "2026-10-05",
   "classification": "reference-assembly-smoke",
   "runtimeExecution": "not_executed",
   "installedGameValidated": false,
@@ -59,14 +59,14 @@
   "verification": {
     "pluginBuild": "passed: zero warnings/errors",
     "pureTests": {
-      "passed": 76,
-      "assertions": 17471
+      "passed": 77,
+      "assertions": 18349
     },
     "packagingGuardTests": {
       "passed": 64
     },
     "assetsAndLocalization": "passed",
-    "publicApiAccessibility": "passed: 838 direct game member sites, 195 unique members, 46 game types; no nonpublic/unresolved",
+    "publicApiAccessibility": "passed: 853 direct game member sites, 195 unique members, 46 game types; no nonpublic/unresolved",
     "gameAcceptanceCases": {
       "total": 35,
       "executed": 0
@@ -77,19 +77,19 @@
     },
     "compiledLocalizationResources": "passed: exact 30-key English/Chinese JSON in main DLL; no satellites",
     "frameworkRuntimeAssemblyResolution": "not_executed: verify installed Unity profile including System.Web.Extensions",
-    "buildIdentity": "cda1f589fb688fcfc43219c3851e9f0c88a2ce2d4268be55937dea3bf695cc36",
+    "buildIdentity": "1f16f1a8e29c585dbf31e0abc12e70add97d9fe30238212068085b038a0276fa",
     "compilerProvenance": "public schema 3 / local capture schema 2: exact plugin/Core hashes, actual Csc references, complete production inventory checked at evaluation/compiler entry/completion, forced real compilation, SDK, configuration, reference mode and distribution hashes; private paths excluded",
     "criticalStartupReflectionTargets": "metadata-only check passed: 10 exact signatures, staticness, return types and original public visibility; native Harmony detours not executed",
     "sessionFailureContainment": "passed: production Core mutation/abort boundary injection; blank and throwing messages, native-stage/postcondition errors, broken sinks, restoration and cleanup; no native execution",
     "harmonyPipeline": {
       "status": "passed",
-      "cases": 16,
-      "assertions": 264,
+      "cases": 22,
+      "assertions": 333,
       "host": "Microsoft.NETCore.App 6.0.36 linux-x64",
       "package": "HarmonyX 2.7.0 / MonoMod.RuntimeDetour+Utils 21.12.13.1 / Mono.Cecil 0.11.4",
       "scope": "actual detours over harmless managed methods using production Core helpers; no DSP/Unity/BepInEx assembly or disk-save execution",
       "hostDetails": "tests/DarkFogSynthesis.Harmony.Tests/characterization-host.json",
-      "productionAdapterSignatures": "passed metadata-only: six exact Begin/save prefix/finalizer signatures and both production Core helper calls"
+      "productionAdapterSignatures": "passed metadata-only: seven Begin/save/Resume prefix/finalizer signatures, shared helper calls, and thread-static restoration reset in finally"
     },
     "assetCheckoutRegression": {
       "status": "passed",
@@ -103,11 +103,12 @@
     },
     "genuineCompilerCaptureRegression": {
       "status": "passed",
-      "assertions": 30,
+      "assertions": 56,
       "project": "actual Core",
-      "scope": "uncompiled additions, failed/repaired compilation, preserved timestamps, early/late build-window mutations, skipped compiler, resource/import additions, rename/delete; no game execution"
+      "scope": "design-time initial/after-real-build SDK compiler arguments and exact candidate preservation; uncompiled additions, failed/repaired compilation, preserved timestamps, early/late build-window mutations, skipped compiler, resource/import additions, rename/delete; no IDE or game execution"
     },
-    "fullReferenceBuildProvenanceRegression": "passed: actual plugin/Core build and both metadata audits; new uncompiled default source refused recording/tested-build/experimental packaging without changing old report or captures; retained repaired source qualified only after real rebuild and audits"
+    "fullReferenceBuildProvenanceRegression": "passed: actual plugin/Core build and both metadata audits; new uncompiled default source refused recording/tested-build/experimental packaging without changing old report or captures; retained repaired source qualified only after real rebuild and audits",
+    "maintenanceCallbackBoundaries": "passed: production pure guard and actual Harmony fixtures refuse pre-quarantine Resume, pause/identity/history/player/loading/validation drift, active-maintenance quarantine release and redirected failed-preflight restoration; pending-Begin Resume preserved; no DSP/disk-save execution"
   },
   "distribution": "All reference binaries stayed outside the source tree and are excluded from source/runtime packages. No game was launched or saves altered during these checks."
 }

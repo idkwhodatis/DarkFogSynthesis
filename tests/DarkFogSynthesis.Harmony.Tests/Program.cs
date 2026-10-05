@@ -15,6 +15,7 @@ namespace DarkFogSynthesis.Harmony.Tests
         private static readonly HarmonyLib.Harmony Patcher = new HarmonyLib.Harmony("DarkFogSynthesis.Harmony.Tests");
         private static Context current = null!;
         private static int assertions;
+        [ThreadStatic] private static MaintenanceSessionGuard? restoringPreflightSession;
 
         private static int Main()
         {
@@ -25,6 +26,8 @@ namespace DarkFogSynthesis.Harmony.Tests
             try
             {
                 PatchSaves();
+                Patcher.Patch(Method(nameof(HarmlessResume)), prefix: Patch(nameof(BeforeResume)));
+                Patcher.Patch(Method(nameof(HarmlessResume)), prefix: Patch(nameof(ForeignResumePrefix), Priority.First));
                 // Pin this case: __runOriginal works with a void prefix, not only a bool prefix.
                 PatchBegin(false);
                 Run("void-prefix-only finalizer observes original completion", VoidPrefixOnly);
@@ -45,7 +48,13 @@ namespace DarkFogSynthesis.Harmony.Tests
                 Run("different validated replacement clears both fixture latches", ValidReplacement);
                 Run("maintenance permit is exact, named, and subordinate to readiness", MaintenancePermit);
                 Run("save state injection balances writes on native failure", SaveFailure);
-                Console.WriteLine("PASS: " + assertions + " assertions across 16 real Harmony pipeline cases");
+                Run("maintenance backup callbacks cannot resume before quarantine", MaintenanceResumeCallback);
+                Run("callback pause/session changes refuse cleanup before mutation", MaintenanceCallbackChanges);
+                Run("failed preflight resumes only its captured validated session", FailedPreflightResume);
+                Run("ordinary native Begin retains pending-session Resume", PendingBeginResume);
+                Run("validated replacement callbacks retain active maintenance quarantine", MaintenanceQuarantineReplacement);
+                Run("foreign Resume prefixes cannot redirect failed-preflight restoration", FailedPreflightResumeReplacement);
+                Console.WriteLine("PASS: " + assertions + " assertions across 22 real Harmony pipeline cases");
                 Console.WriteLine("Boundary: no game integration, actual disk saves, cleanup, or uninstall tested.");
                 return 0;
             }
@@ -122,6 +131,7 @@ namespace DarkFogSynthesis.Harmony.Tests
         private static void HarmlessBegin()
         {
             current.NativeBeginCalls++;
+            if (current.ExerciseBeginResume) HarmlessResume();
             if (current.ExerciseCallbackSaves) AttemptAllSaves();
             if (current.FailurePoint == "native") throw current.Failure;
         }
@@ -167,8 +177,8 @@ namespace DarkFogSynthesis.Harmony.Tests
                         current.State.CompleteValidatedSession(current.Identity);
                         current.CompletionCalls++;
                         if (current.ExerciseCompletionSaves) AttemptAllSaves();
-                        if (current.QuarantinedIdentity != null &&
-                            !ReferenceEquals(current.QuarantinedIdentity, current.Identity))
+                        if (MaintenanceSessionGuard.CanReleaseQuarantineAfterValidation(current.Cleaning,
+                            current.QuarantinedIdentity, current.Identity))
                         {
                             current.QuarantinedIdentity = null;
                             current.QuarantineReleaseCalls++;
@@ -207,9 +217,26 @@ namespace DarkFogSynthesis.Harmony.Tests
         {
             Check(current.WritesInProgress == 1, "Save original did not retain its granted write state");
             current.NativeSaveCalls++;
+            current.SaveCallback?.Invoke();
             if (current.ThrowFromSave) throw current.Failure;
             return true;
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void HarmlessResume() { current.NativeResumeCalls++; current.Paused = false; }
+
+        private static bool BeforeResume()
+        {
+            lock (current.SaveGate)
+            {
+                if (!MaintenanceSessionGuard.AllowsResume(current.StartupReady && !current.State.IsBlocked,
+                    current.Cleaning, current.QuarantinedIdentity != null)) return false;
+                return restoringPreflightSession == null || restoringPreflightSession.CanRestoreRunningSession(current.Identity,
+                    current.History, current.Player, current.Loading, current.StartupReady && current.State.CanPersist(current.Identity));
+            }
+        }
+
+        private static void ForeignResumePrefix() => current.ResumePrefixCallback?.Invoke();
 
         private static class NamedSavePatch
         {
@@ -498,12 +525,200 @@ namespace DarkFogSynthesis.Harmony.Tests
                 "Save exception leaked granted write state");
         }
 
+        private static MaintenanceSessionGuard PrepareMaintenance()
+        {
+            NewContext();
+            HarmlessBegin();
+            var guard = new MaintenanceSessionGuard(current.Identity, current.History, current.Player, current.Paused);
+            current.Paused = true;
+            current.Cleaning = true;
+            current.PermittedName = "maintenance-backup";
+            return guard;
+        }
+
+        private static void RequirePausedMaintenance(MaintenanceSessionGuard guard) =>
+            guard.EnsurePausedSession(current.Identity, current.History, current.Player, current.Paused,
+                current.Loading, current.StartupReady && current.State.CanPersist(current.Identity));
+
+        private static void MaintenanceResumeCallback()
+        {
+            var guard = PrepareMaintenance();
+            current.SaveCallback = HarmlessResume;
+            Check(current.QuarantinedIdentity == null && current.State.CanPersist(current.Identity),
+                "The callback case must use a validated session before quarantine");
+            Check(HarmlessNamedSave("maintenance-backup"), "Maintenance backup's exact permit stopped working");
+            RequirePausedMaintenance(guard);
+            Check(current.NativeResumeCalls == 0 && current.Paused && current.WritesInProgress == 0,
+                "A native save callback resumed cleaning before quarantine");
+            current.Cleaning = false;
+            current.QuarantinedIdentity = current.Identity;
+            HarmlessResume();
+            Check(current.NativeResumeCalls == 0 && current.Paused, "Quarantined candidate resumed");
+        }
+
+        private static void MaintenanceCallbackChanges()
+        {
+            foreach (string change in new[] { "pause", "session", "history", "player", "loading", "validation" })
+            {
+                var guard = PrepareMaintenance();
+                current.SaveCallback = () => {
+                    switch (change)
+                    {
+                        case "pause": current.Paused = false; break;
+                        case "session":
+                            current.Identity = new object();
+                            current.State.BeginSession(current.Identity);
+                            current.State.CompleteValidatedSession(current.Identity);
+                            break;
+                        case "history": current.History = new object(); break;
+                        case "player": current.Player = new object(); break;
+                        case "loading": current.Loading = true; break;
+                        case "validation": current.State.BeginSession(current.Identity); break;
+                    }
+                };
+                Check(HarmlessNamedSave("maintenance-backup"), "Harmless callback save did not execute");
+                int mutations = 0;
+                Exception? refusal = null;
+                try { RequirePausedMaintenance(guard); mutations++; }
+                catch (InvalidOperationException error) { refusal = error; }
+                Check(refusal != null && mutations == 0,
+                    "Callback " + change + " change escaped the production pre-mutation boundary check");
+                Check(current.NativeResumeCalls == 0,
+                    "Direct field-change injection must not be mistaken for a guarded Resume call");
+            }
+        }
+
+        private static void TryRestoreFailedPreflight(MaintenanceSessionGuard guard)
+        {
+            bool restoreRunning;
+            lock (current.SaveGate)
+            {
+                current.Cleaning = false;
+                restoreRunning = guard.CanRestoreRunningSession(current.Identity, current.History, current.Player, current.Loading,
+                    current.StartupReady && current.State.CanPersist(current.Identity));
+            }
+            if (restoreRunning)
+            {
+                var previous = restoringPreflightSession;
+                restoringPreflightSession = guard;
+                try { HarmlessResume(); }
+                finally { restoringPreflightSession = previous; }
+            }
+        }
+
+        private static void FailedPreflightResume()
+        {
+            var guard = PrepareMaintenance();
+            HarmlessResume();
+            Check(current.NativeResumeCalls == 0 && current.Paused, "Maintenance cleared before failed-preflight restoration");
+            TryRestoreFailedPreflight(guard);
+            Check(!current.Cleaning && !current.Paused && current.NativeResumeCalls == 1,
+                "A failed preflight did not restore its captured originally running session");
+
+            foreach (string change in new[] { "session", "pending", "loading", "history", "player", "startup", "quarantine", "previously-paused" })
+            {
+                guard = PrepareMaintenance();
+                switch (change)
+                {
+                    case "session":
+                        current.Identity = new object();
+                        current.State.BeginSession(current.Identity);
+                        current.State.CompleteValidatedSession(current.Identity);
+                        break;
+                    case "pending": current.State.BeginSession(current.Identity); break;
+                    case "loading": current.Loading = true; break;
+                    case "history": current.History = new object(); break;
+                    case "player": current.Player = new object(); break;
+                    case "startup": current.StartupReady = false; break;
+                    case "quarantine": current.QuarantinedIdentity = current.Identity; break;
+                    case "previously-paused":
+                        guard = new MaintenanceSessionGuard(current.Identity, current.History, current.Player, true);
+                        break;
+                }
+                TryRestoreFailedPreflight(guard);
+                Check(!current.Cleaning && current.Paused && current.NativeResumeCalls == 0,
+                    "Failed preflight incorrectly resumed " + change + " context");
+            }
+        }
+
+        private static void PendingBeginResume()
+        {
+            NewContext();
+            current.Paused = true;
+            current.ExerciseBeginResume = true;
+            current.ExerciseCallbackSaves = true;
+            HarmlessBegin();
+            Check(current.NativeResumeCalls == 1 && !current.Paused && current.RefusedSaves == 12,
+                "Ordinary native Begin must retain Resume while callback persistence stays closed");
+        }
+
+        private static void MaintenanceQuarantineReplacement()
+        {
+            var guard = PrepareMaintenance();
+            object quarantined = current.QuarantinedIdentity = current.Identity;
+            current.SaveCallback = () => {
+                current.Identity = new object();
+                current.State.BeginSession(current.Identity);
+                HarmlessBegin();
+            };
+            Check(HarmlessNamedSave("maintenance-backup"), "Harmless replacement callback did not execute");
+            Check(current.State.CanPersist(current.Identity) && ReferenceEquals(current.QuarantinedIdentity, quarantined) &&
+                current.QuarantineReleaseCalls == 0, "Replacement callback cleared active cleanup quarantine");
+            bool refused = false;
+            try { RequirePausedMaintenance(guard); }
+            catch (InvalidOperationException) { refused = true; }
+            Check(refused, "A late replaced-session boundary allowed cleanup success or rollback");
+            current.Cleaning = false;
+            HarmlessResume();
+            Check(current.NativeResumeCalls == 0 && current.Paused, "Failed cleanup quarantine did not survive barrier release");
+            current.Identity = new object();
+            current.State.BeginSession(current.Identity);
+            HarmlessBegin();
+            Check(current.QuarantinedIdentity == null && current.QuarantineReleaseCalls == 1,
+                "Normal later validated replacement could not release maintenance quarantine");
+        }
+
+        private static void FailedPreflightResumeReplacement()
+        {
+            foreach (bool throwFromPrefix in new[] { false, true })
+            {
+                var guard = PrepareMaintenance();
+                object captured = current.Identity;
+                int foreignCalls = 0;
+                current.ResumePrefixCallback = () => {
+                    foreignCalls++;
+                    current.Identity = new object();
+                    current.State.BeginSession(current.Identity);
+                    current.State.CompleteValidatedSession(current.Identity);
+                    if (throwFromPrefix) throw current.Failure;
+                };
+                Exception? observed = null;
+                try { TryRestoreFailedPreflight(guard); }
+                catch (Exception error) { observed = error; }
+                Check(throwFromPrefix ? ReferenceEquals(observed, current.Failure) : observed == null,
+                    "Restoration changed a foreign Resume prefix exception");
+                Check(foreignCalls == 1 && !ReferenceEquals(current.Identity, captured) && current.State.CanPersist(current.Identity),
+                    "The actual earlier Harmony prefix must install a different fully validated session");
+                Check(!current.Cleaning && current.Paused && current.NativeResumeCalls == 0,
+                    "A foreign prefix redirected automatic preflight Resume to its replacement session");
+                current.ResumePrefixCallback = null;
+                HarmlessResume();
+                Check(!current.Paused && current.NativeResumeCalls == 1,
+                    "The automatic-restoration scope leaked into a later ordinary Resume");
+            }
+        }
+
         private sealed class Context
         {
             internal readonly SessionCompatibilityState State = new SessionCompatibilityState();
             internal readonly Exception Failure = new InvalidOperationException("Harmless injected failure");
             internal object Identity = new object();
+            internal object History = new object(), Player = new object();
+            internal readonly object SaveGate = new object();
             internal object? QuarantinedIdentity;
+            internal Action? SaveCallback, ResumePrefixCallback;
+            internal bool Paused, Loading, ExerciseBeginResume;
+            internal int NativeResumeCalls;
             internal bool SkipOriginal, ExerciseCallbackSaves, ExerciseCompletionSaves, Cleaning, NestedTriggered, ThrowFromSave;
             internal bool AcceptLateValidation = true, StartupReady = true;
             internal string? FailurePoint, PermittedName, NestedAtStage;

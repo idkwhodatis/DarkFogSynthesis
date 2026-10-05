@@ -1,6 +1,6 @@
 # Source-side verification evidence
 
-Recorded 2026-10-04 in the implementation workspace. These checks validate source artifacts and packaging behavior only; they do not execute Dyson Sphere Program or establish the D01–V01 game acceptance results.
+Recorded 2026-10-05 in the implementation workspace. These checks validate source artifacts and packaging behavior only; they do not execute Dyson Sphere Program or establish the D01–V01 game acceptance results.
 
 | Check | Result | Evidence/command |
 |---|---|---|
@@ -18,7 +18,7 @@ The compiler and pure-test evidence is recorded separately in the compile baseli
 
 ## Integrated source and compiler checks
 
-- Core: **76/76 tests, 17,471 assertions passed**. Covers frozen recipes/costs, immutable typed IDs, all four configuration combinations, 4,096 research/unlock combinations, repeated sessions, foreign-edge ownership/restoration, conservative removal predicates and fixed manifest/localization coherence
+- Core: **77/77 tests, 18,349 assertions passed**. Covers frozen recipes/costs, immutable typed IDs, all four configuration combinations, 4,096 research/unlock combinations, repeated sessions, foreign-edge ownership/restoration, conservative removal predicates and fixed manifest/localization coherence
 - Runtime plugin: **build passed, zero warnings/errors**, against the exact compile-only reference combination in [compile-baseline.json](compatibility/compile-baseline.json). This is not the user's installation or a game execution
 - [PublicApiAudit](../scripts/PublicApiAudit/README.md): metadata-only scan passed with no unresolved or originally nonpublic direct game accesses. A compile-only negative fixture correctly rejected the private RecipeProto productivity setter; runtime access uses explicit reflection instead
 - Both owned DLLs can be packaged only with matching hashes/fingerprint and the `reference-assembly-smoke` classification. Formal release remains refused
@@ -58,3 +58,11 @@ Final aggregate results: **76 pure tests / 17,471 assertions**, **57 packaging t
 The [build-input review](compatibility/build-input-review.md) records independent reproductions and fixes for clean CRLF checkout hash failures and stale source-to-DLL recording. Final local checks passed: **76 pure tests / 17,471 assertions**, **16 real-Harmony cases / 264 assertions**, **64 packaging tests**, **3 fresh-checkout cases**, **30 genuine Core-build assertions**, and **15 resource-audit self-tests**. The Core fixture covers preserved timestamps, compiler failures, files added before capture/after compilation, explicit compiler skipping, successful recovery and inventory membership changes.
 
 A separate fresh plugin/Core reference build and both real metadata audits confirmed that adding an uncompiled default C# source refuses recording, tested-build inspection and experimental packaging while leaving the prior report/captures intact; retaining a repaired source and rebuilding restores qualification. The final main reference compile passed with zero warnings/errors, exact bilingual resources and **838 direct API sites / 195 members / 46 types**, zero nonpublic/unresolved accesses. The source/package tools and new scripts passed Python syntax and whitespace checks. Local checkout tests ran on Linux; native Windows checkout/Core results are separate CI evidence. All 35 actual game scenarios remain unexecuted.
+
+## Design-time and maintenance callback follow-up — 2026-10-05
+
+The [current review](compatibility/design-time-maintenance-review.md) includes an independent SDK reproduction of design-time capture destruction and the new preservation regression. The actual Core-build fixture passed **56 assertions**, including real compiler arguments, initial no-DLL/no-capture behavior, exact preservation after a real build, an explicit capture-property override and a fresh CLI profile. It does not launch Visual Studio.
+
+The complete local aggregate passed **77 pure tests / 18,349 assertions**, **22 real-Harmony cases / 333 assertions**, **64 packaging tests**, **3 checkout cases** and **15 resource-audit self-tests**. Callback fixtures test the pre-quarantine resume refusal, pause/ownership/validation changes, active-maintenance replacement, scoped failed-preflight restoration and a foreign Resume prefix replacing the session or throwing. Normal pending-Begin resume and exact maintenance save permits remain covered. No fixture loads game types or writes a game save.
+
+The final reference build passed with zero warnings/errors; resource audit confirmed both exact bilingual dictionaries in the main DLL. Public API audit passed **853 sites / 195 members / 46 types**, zero nonpublic/unresolved. Metadata inspection tied seven native patch-adapter signatures, the shared maintenance helper calls, and the thread-static restoration scope's finally reset to the recorded plugin hash. The checked-in release report remains refused and all 35 actual game acceptance cases remain unexecuted.
