@@ -62,7 +62,9 @@ namespace DarkFogSynthesis.Harmony.Tests
                 Run("active multiplayer rejects Begin without permanent startup failure", MultiplayerEntry);
                 Run("late multiplayer activation closes saves and mutations; fresh SP recovers", MultiplayerTransition);
                 Run("multiplayer activated in Begin callbacks cannot complete validation", MultiplayerLateBegin);
-                Console.WriteLine("PASS: " + assertions + " assertions across 28 real Harmony pipeline cases");
+                Run("per-target export/reset callbacks cannot enroll or reset changed machines", () => RemovalTargetHarmonyTests.Run(Check, true));
+                Run("unchanged empty targets preserve single-player cleanup admission", () => RemovalTargetHarmonyTests.Run(Check, false));
+                Console.WriteLine("PASS: " + assertions + " assertions across 30 real Harmony pipeline cases");
                 Console.WriteLine("Boundary: no game integration, actual disk saves, cleanup, or uninstall tested.");
                 return 0;
             }

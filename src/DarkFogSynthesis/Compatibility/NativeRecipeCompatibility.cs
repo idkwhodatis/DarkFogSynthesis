@@ -262,47 +262,15 @@ namespace DarkFogSynthesis.Compatibility
         }
 
         private static bool TryGetEmptyStack(FactorySystem system, int selected, out List<int> stack)
-        {
-            stack = new List<int>();
-            if (selected <= 0 || selected >= system.labCursor || selected >= system.labPool.Length ||
-                system.labPool[selected].id != selected) return false;
-            var preceding = new Dictionary<int, int>();
-            var ambiguous = new HashSet<int>();
-            for (int i = 1; i < system.labCursor && i < system.labPool.Length; i++)
-            {
-                if (system.labPool[i].id != i || system.labPool[i].nextLabId <= 0) continue;
-                int next = system.labPool[i].nextLabId;
-                if (preceding.ContainsKey(next)) ambiguous.Add(next);
-                else preceding.Add(next, i);
-            }
-            var seen = new HashSet<int>();
-            int root = selected;
-            while (preceding.TryGetValue(root, out int previous))
-            {
-                if (ambiguous.Contains(root) || !seen.Add(root)) return false;
-                root = previous;
-            }
-            seen.Clear();
-            for (int id = root; id != 0; id = system.labPool[id].nextLabId)
-            {
-                if (id <= 0 || id >= system.labCursor || id >= system.labPool.Length ||
-                    !seen.Add(id) || ambiguous.Contains(id)) return false;
-                LabComponent lab = system.labPool[id];
-                if (lab.id != id || lab.recipeId != 0 || lab.researchMode || lab.techId != 0 ||
-                    lab.replicating || lab.time != 0 || lab.extraTime != 0 ||
-                    lab.cycleCount != 0 || lab.extraCycleCount != 0 ||
-                    HasAnyValue(lab.served) || HasAnyValue(lab.incServed) || HasAnyValue(lab.produced) ||
-                    HasAnyValue(lab.matrixServed) || HasAnyValue(lab.matrixIncServed)) return false;
-                stack.Add(id);
-            }
-            return stack.Contains(selected);
-        }
-
-        private static bool HasAnyValue(int[]? values)
-        {
-            if (values == null) return false;
-            foreach (int value in values) if (value != 0) return true;
-            return false;
-        }
+            => LabStackPreflight.TryCollect(selected, system.labCursor,
+                system.labPool.Length, i => system.labPool[i].id, i => system.labPool[i].nextLabId, i =>
+                {
+                    LabComponent lab = system.labPool[i];
+                    return LabStackPreflight.IsEmpty(
+                        lab.recipeId, lab.techId, lab.researchMode, lab.replicating,
+                        lab.time, lab.extraTime, lab.cycleCount, lab.extraCycleCount,
+                        lab.hashBytes, lab.extraHashBytes, lab.served, lab.incServed, lab.produced,
+                        lab.matrixServed, lab.matrixIncServed);
+                }, out stack);
     }
 }

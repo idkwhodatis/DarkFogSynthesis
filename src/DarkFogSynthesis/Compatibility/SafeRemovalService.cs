@@ -199,43 +199,50 @@ namespace DarkFogSynthesis.Compatibility
                 });
                 foreach (var target in scan.Assemblers)
                 {
-                    RequirePausedSession(session);
-                    var factory = target.Item1; int index = target.Item2;
-                    var component = factory.factorySystem.assemblerPool[index];
-                    int entity = component.entityId;
-                    var sign = factory.entitySignPool[entity];
-                    byte[] bytes = Serialize(w => component.Export(w));
-                    RequirePausedSession(session);
-                    rollback.Add(() =>
+                    var factory = target.Factory; var system = target.System; int index = target.Identity.ComponentId;
+                    RemovalTargetGuard.Reset(() => { RequirePausedSession(session); target.Validate(data); }, () =>
                     {
-                        if (factory.factorySystem.assemblerPool[index].id != component.id || factory.factorySystem.assemblerPool[index].entityId != entity)
-                            throw new InvalidOperationException("An assembler was replaced during cleanup; refusing to overwrite a different entity.");
-                        using (var reader = new BinaryReader(new MemoryStream(bytes))) factory.factorySystem.assemblerPool[index].Import(reader);
+                        var component = system.assemblerPool[index];
+                        int entity = component.entityId;
+                        var sign = factory.entitySignPool[entity];
+                        byte[] bytes = Serialize(w => component.Export(w));
+                        return () =>
+                        {
+                            // Rollback restores only the machine enrolled before its reset, not a replacement.
+                            target.ValidateLocation(data);
+                            using (var reader = new BinaryReader(new MemoryStream(bytes))) system.assemblerPool[index].Import(reader);
+                            RequirePausedSession(session);
+                            target.ValidateLocation(data);
+                            factory.entitySignPool[entity] = sign;
+                        };
+                    }, rollback.Add, () =>
+                    {
+                        system.assemblerPool[index].SetRecipe(0, factory.entitySignPool);
                         RequirePausedSession(session);
-                        factory.entitySignPool[entity] = sign;
                     });
-                    factory.factorySystem.assemblerPool[index].SetRecipe(0, factory.entitySignPool);
-                    RequirePausedSession(session);
                 }
                 foreach (var target in scan.Labs)
                 {
-                    RequirePausedSession(session);
-                    var factory = target.Item1; int index = target.Item2;
-                    var component = factory.factorySystem.labPool[index];
-                    int entity = component.entityId;
-                    var sign = factory.entitySignPool[entity];
-                    byte[] bytes = Serialize(w => component.Export(w));
-                    RequirePausedSession(session);
-                    rollback.Add(() =>
+                    var factory = target.Factory; var system = target.System; int index = target.Identity.ComponentId;
+                    RemovalTargetGuard.Reset(() => { RequirePausedSession(session); target.Validate(data); }, () =>
                     {
-                        if (factory.factorySystem.labPool[index].id != component.id || factory.factorySystem.labPool[index].entityId != entity)
-                            throw new InvalidOperationException("A lab was replaced during cleanup; refusing to overwrite a different entity.");
-                        using (var reader = new BinaryReader(new MemoryStream(bytes))) factory.factorySystem.labPool[index].Import(reader);
+                        var component = system.labPool[index];
+                        int entity = component.entityId;
+                        var sign = factory.entitySignPool[entity];
+                        byte[] bytes = Serialize(w => component.Export(w));
+                        return () =>
+                        {
+                            target.ValidateLocation(data);
+                            using (var reader = new BinaryReader(new MemoryStream(bytes))) system.labPool[index].Import(reader);
+                            RequirePausedSession(session);
+                            target.ValidateLocation(data);
+                            factory.entitySignPool[entity] = sign;
+                        };
+                    }, rollback.Add, () =>
+                    {
+                        system.labPool[index].SetFunction(false, 0, 0, factory.entitySignPool);
                         RequirePausedSession(session);
-                        factory.entitySignPool[entity] = sign;
                     });
-                    factory.factorySystem.labPool[index].SetFunction(false, 0, 0, factory.entitySignPool);
-                    RequirePausedSession(session);
                 }
                 // Queued/current custom research was rejected in preflight. Do not invoke queue APIs whose
                 // current-tech/mecha cache side effects cannot yet be safely rolled back on this target.
@@ -350,7 +357,8 @@ namespace DarkFogSynthesis.Compatibility
                 {
                     var assembler = system.assemblerPool[index];
                     if (assembler.id != index || !Recipes.Contains(assembler.recipeId)) continue;
-                    result.Assemblers.Add(Tuple.Create(factory, index));
+                    result.Assemblers.Add(new RemovalTarget(factory, f, system, false,
+                        new RemovalTargetIdentity(assembler.id, assembler.entityId, assembler.recipeId, 0, false, false)));
                     if (RemovalSafetyPolicy.HasProductionState(assembler.time, assembler.extraTime, assembler.cycleCount,
                         assembler.extraCycleCount, assembler.replicating, assembler.served, assembler.incServed, assembler.produced))
                         result.Blockers.Add("Drain/reset assembler " + index + " on planet " + factory.planetId + " with vanilla controls; it contains resources or production progress.");
@@ -359,7 +367,8 @@ namespace DarkFogSynthesis.Compatibility
                 {
                     var lab = system.labPool[index];
                     if (lab.id != index || (!Recipes.Contains(lab.recipeId) && !Technologies.Contains(lab.techId))) continue;
-                    result.Labs.Add(Tuple.Create(factory, index));
+                    result.Labs.Add(new RemovalTarget(factory, f, system, true,
+                        new RemovalTargetIdentity(lab.id, lab.entityId, lab.recipeId, lab.techId, lab.researchMode, lab.matrixMode)));
                     if (RemovalSafetyPolicy.HasProductionState(lab.time, lab.extraTime, lab.cycleCount, lab.extraCycleCount,
                         lab.replicating, lab.served, lab.incServed, lab.produced)
                         || RemovalSafetyPolicy.HasResearchState(lab.hashBytes, lab.extraHashBytes, lab.matrixServed, lab.matrixIncServed))
@@ -389,12 +398,83 @@ namespace DarkFogSynthesis.Compatibility
             if (!file.Exists || file.Length == 0) throw new IOException("Native save did not produce a nonempty file: " + name);
         }
 
+        /// <summary>Captured native location and configuration; each use re-reads the live component.</summary>
+        private sealed class RemovalTarget
+        {
+            internal PlanetFactory Factory { get; }
+            internal FactorySystem System { get; }
+            internal RemovalTargetIdentity Identity { get; }
+            private readonly int factoryIndex;
+            private readonly bool isLab;
+            private readonly int entityProtoId;
+            private readonly int entityModelIndex;
+
+            internal RemovalTarget(PlanetFactory factory, int factoryIndex, FactorySystem system, bool isLab,
+                RemovalTargetIdentity identity)
+            {
+                Factory = factory; System = system; this.factoryIndex = factoryIndex; this.isLab = isLab; Identity = identity;
+                if (identity.EntityId <= 0 || identity.EntityId >= factory.entityCursor || identity.EntityId >= factory.entityPool.Length)
+                    throw new InvalidOperationException("Removal target has an invalid entity reference.");
+                var entity = factory.entityPool[identity.EntityId];
+                entityProtoId = entity.protoId; entityModelIndex = entity.modelIndex;
+            }
+
+            internal bool SameTarget(RemovalTarget other) => ReferenceEquals(Factory, other.Factory) &&
+                ReferenceEquals(System, other.System) && factoryIndex == other.factoryIndex && isLab == other.isLab &&
+                Identity.Equals(other.Identity) && entityProtoId == other.entityProtoId && entityModelIndex == other.entityModelIndex;
+
+            internal void ValidateLocation(GameData data)
+            {
+                int index = Identity.ComponentId, entityId = Identity.EntityId;
+                if (factoryIndex < 0 || factoryIndex >= data.factoryCount || factoryIndex >= data.factories.Length ||
+                    !ReferenceEquals(data.factories[factoryIndex], Factory) || !ReferenceEquals(Factory.factorySystem, System) ||
+                    index <= 0 || (isLab ? index >= System.labCursor || index >= System.labPool.Length :
+                        index >= System.assemblerCursor || index >= System.assemblerPool.Length) ||
+                    entityId <= 0 || entityId >= Factory.entityCursor || entityId >= Factory.entityPool.Length ||
+                    entityId >= Factory.entitySignPool.Length)
+                    throw new InvalidOperationException("Removal target factory or pool location changed; refusing to overwrite a replacement.");
+                var entity = Factory.entityPool[entityId];
+                bool componentMatches = isLab ? System.labPool[index].id == index && System.labPool[index].entityId == entityId :
+                    System.assemblerPool[index].id == index && System.assemblerPool[index].entityId == entityId;
+                if (!componentMatches || entity.id != entityId || entity.protoId != entityProtoId || entity.modelIndex != entityModelIndex ||
+                    (isLab ? entity.labId != index : entity.assemblerId != index))
+                    throw new InvalidOperationException("Removal target entity association changed; refusing to overwrite a replacement.");
+            }
+
+            internal void Validate(GameData data)
+            {
+                ValidateLocation(data);
+                int index = Identity.ComponentId;
+                if (isLab)
+                {
+                    var lab = System.labPool[index];
+                    RemovalTargetGuard.EnsureUnchanged(Identity,
+                        new RemovalTargetIdentity(lab.id, lab.entityId, lab.recipeId, lab.techId, lab.researchMode, lab.matrixMode),
+                        Recipes.Contains(lab.recipeId) || Technologies.Contains(lab.techId),
+                        RemovalSafetyPolicy.HasProductionState(lab.time, lab.extraTime, lab.cycleCount, lab.extraCycleCount,
+                            lab.replicating, lab.served, lab.incServed, lab.produced) ||
+                        RemovalSafetyPolicy.HasResearchState(lab.hashBytes, lab.extraHashBytes, lab.matrixServed, lab.matrixIncServed));
+                }
+                else
+                {
+                    var assembler = System.assemblerPool[index];
+                    RemovalTargetGuard.EnsureUnchanged(Identity,
+                        new RemovalTargetIdentity(assembler.id, assembler.entityId, assembler.recipeId, 0, false, false),
+                        Recipes.Contains(assembler.recipeId),
+                        RemovalSafetyPolicy.HasProductionState(assembler.time, assembler.extraTime, assembler.cycleCount,
+                            assembler.extraCycleCount, assembler.replicating, assembler.served, assembler.incServed, assembler.produced));
+                }
+            }
+        }
+
         private sealed class ScanResult
         {
             internal List<string> Blockers { get; } = new List<string>();
-            internal List<Tuple<PlanetFactory, int>> Assemblers { get; } = new List<Tuple<PlanetFactory, int>>();
-            internal List<Tuple<PlanetFactory, int>> Labs { get; } = new List<Tuple<PlanetFactory, int>>();
-            internal bool SameTargets(ScanResult other) => Assemblers.SequenceEqual(other.Assemblers) && Labs.SequenceEqual(other.Labs);
+            internal List<RemovalTarget> Assemblers { get; } = new List<RemovalTarget>();
+            internal List<RemovalTarget> Labs { get; } = new List<RemovalTarget>();
+            internal bool SameTargets(ScanResult other) => SameTargets(Assemblers, other.Assemblers) && SameTargets(Labs, other.Labs);
+            private static bool SameTargets(List<RemovalTarget> left, List<RemovalTarget> right) => left.Count == right.Count &&
+                left.Zip(right, (a, b) => a.SameTarget(b)).All(same => same);
         }
     }
 }
