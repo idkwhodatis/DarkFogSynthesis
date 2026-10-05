@@ -10,7 +10,7 @@
   "dark_fog_synthesis.recipe.dark_fog_matrix.name": "黑雾矩阵合成",
   "dark_fog_synthesis.recipe.dark_fog_matrix.description": "在矩阵研究站中将晶格硅 ×2、光子合并器 ×1、电浆激发器 ×1、钛化玻璃 ×1 合成为黑雾矩阵 ×1。基础耗时：4 秒。",
   "dark_fog_synthesis.recipe.silicon_neuron.name": "硅基神经元合成",
-  "dark_fog_synthesis.recipe.silicon_neuron.description": "将微晶元件 ×2、粒子宽带 ×1、晶格硅 ×2 制造为硅基神经元 ×1。基础耗时：4 秒。",
+  "dark_fog_synthesis.recipe.silicon_neuron.description": "将微晶元件 ×2、钛合金 ×2、晶格硅 ×2 制造为硅基神经元 ×1。基础耗时：4 秒。",
   "dark_fog_synthesis.recipe.matter_recombinator.name": "物质重组器合成",
   "dark_fog_synthesis.recipe.matter_recombinator.description": "将位面过滤器 ×1、超级磁场环 ×2、氢 ×2、晶格硅 ×2 制造为物质重组器 ×1。基础耗时：6 秒。",
   "dark_fog_synthesis.recipe.negentropy_singularity.name": "负熵奇点合成",
@@ -28,5 +28,6 @@
   "dark_fog_synthesis.runtime.export": "导出兼容性诊断",
   "dark_fog_synthesis.removal.preview": "预览移除检查",
   "dark_fog_synthesis.removal.action": "清理本 Mod 数据并另存",
-  "dark_fog_synthesis.removal.warning": "清理流程尚未验证：请保留未修改的备份。存在未知引用或无法安全处理的缓存时必须停止。预检通过不代表已证明兼容纯原版。"
+  "dark_fog_synthesis.removal.warning": "清理流程尚未验证：请保留未修改的备份。存在未知引用或无法安全处理的缓存时必须停止。预检通过不代表已证明兼容纯原版。",
+  "dark_fog_synthesis.lab.requires_technology": "需要研究：{0}"
 }

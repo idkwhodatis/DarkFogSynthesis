@@ -10,7 +10,7 @@
   "dark_fog_synthesis.recipe.dark_fog_matrix.name": "Dark Fog Matrix Synthesis",
   "dark_fog_synthesis.recipe.dark_fog_matrix.description": "Combine 2 crystalline silicon, 1 photon combiner, 1 plasma exciter, and 1 titanium glass in a matrix lab to produce 1 Dark Fog Matrix. Base time: 4 seconds.",
   "dark_fog_synthesis.recipe.silicon_neuron.name": "Silicon-based Neuron Synthesis",
-  "dark_fog_synthesis.recipe.silicon_neuron.description": "Assemble 2 microcrystalline components, 1 particle broadband, and 2 crystalline silicon into 1 silicon-based neuron. Base time: 4 seconds.",
+  "dark_fog_synthesis.recipe.silicon_neuron.description": "Assemble 2 microcrystalline components, 2 titanium alloy, and 2 crystalline silicon into 1 silicon-based neuron. Base time: 4 seconds.",
   "dark_fog_synthesis.recipe.matter_recombinator.name": "Matter Recombinator Synthesis",
   "dark_fog_synthesis.recipe.matter_recombinator.description": "Assemble 1 plane filter, 2 super-magnetic rings, 2 hydrogen, and 2 crystalline silicon into 1 matter recombinator. Base time: 6 seconds.",
   "dark_fog_synthesis.recipe.negentropy_singularity.name": "Negentropy Singularity Synthesis",
@@ -28,5 +28,6 @@
   "dark_fog_synthesis.runtime.export": "Export compatibility diagnostics",
   "dark_fog_synthesis.removal.preview": "Preview removal preflight",
   "dark_fog_synthesis.removal.action": "Prepare a Vanilla-Compatible Save",
-  "dark_fog_synthesis.removal.warning": "Unverified cleanup: keep your untouched backup. Unknown references or unsafe buffers must block this operation. A preflight pass does not prove vanilla compatibility."
+  "dark_fog_synthesis.removal.warning": "Unverified cleanup: keep your untouched backup. Unknown references or unsafe buffers must block this operation. A preflight pass does not prove vanilla compatibility.",
+  "dark_fog_synthesis.lab.requires_technology": "Requires research: {0}"
 }
