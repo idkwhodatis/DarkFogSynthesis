@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "classification": "source-and-reference-assembly-smoke-only",
+  "baselineCommit": "df7ea277c62ea3cd0c00634cccc461c1050e3698",
+  "codeCommit": "c1fb04aa0626a3082698dfb390fc20f37c775ad6",
+  "verificationWorkflowRun": 37266955514,
+  "verificationWorkflowJob": 111625682996,
+  "verificationWorkflowStatus": "success",
+  "executionOrder": "Applied an exact hash-checked nine-file patch to staging commit 69201ad7b8ab09d3f4338e4df671a45ac4bee620, ran the listed tests and reference builds/audits, then committed and fast-forward pushed the tested code while removing all four temporary integration files. The returned source artifact matched all nine locally reviewed files byte-for-byte; its working-tree diff was empty.",
+  "checks": {
+    "pureCore": {"passed": 82, "assertions": 18882},
+    "harmlessHarmonyFixtures": {"passed": 28, "assertions": 453},
+    "activeSessionGuardMutation": {"status": "passed", "suitesRejectingDisabledCheck": 2, "scope": "Temporarily changed the production probe to always report single-player, confirmed the specific expected Core and Harmony assertion failures rather than compiler errors, and restored the original source bytes before reference compilation."},
+    "packagingFixtures": {"passed": 64, "host": "GitHub Actions Linux"},
+    "compilerCapture": {"assertions": 56, "host": "Linux"},
+    "checkoutAssets": {"passed": 3, "host": "Linux"},
+    "runtimeSnapshotFixtures": {"passed": 26},
+    "uiGeometryAndTextFixtures": {"passed": 17},
+    "generatedUnityProjectFixtures": {"passed": 5, "editorExecution": "not_executed"},
+    "resourceAuditSelfTests": {"passed": 15},
+    "referencePluginBuild": {"warnings": 0, "errors": 0},
+    "optionalUnityFixtureReferenceBuild": {"warnings": 0, "errors": 0, "engineExecution": "not_executed"},
+    "bilingualResources": {"keysPerDictionary": 31, "satelliteFree": true},
+    "publicApiAudit": {"directGameMemberSites": 932, "uniqueGameMembers": 195, "gameTypes": 48, "nonpublicAccesses": 0, "unresolvedReferences": 0}
+  },
+  "singlePlayerFixtureCoverage": [
+    "No Nebula implementation: no optional type resolution and normal native lifecycle/save entrypoints remain permitted.",
+    "Nebula installed but inactive: native Begin/Resume, all four normal save entrypoints and custom-mutation preflight remain available.",
+    "Only the API plugin installed: treated as no multiplayer implementation.",
+    "Active session before Begin or during its callbacks: refused without poisoning startup/content registration.",
+    "Late activation: immediate save/resume/custom-mutation gates close; existing session containment is retained.",
+    "After leaving multiplayer: a fresh successfully validated single-player identity recovers; the affected identity is not silently requalified.",
+    "Missing or throwing optional state getter: no false single-player claim and no permanent negative-lookup cache."
+  ],
+  "buildIdentity": "2451241c219af9f7910ca457bdbdbe6dc077bd7a203ea70d005a61d926a3fcf8",
+  "assemblies": {
+    "DarkFogSynthesis.dll": "a2c655cf63b00b10005644966c199fba0e54a5901097a1384ffc65db0c1726cc",
+    "DarkFogSynthesis.Core.dll": "5617228c2a49e5d1755f779e04de857cc08d485cb760fda8c07a33981a5542ad"
+  },
+  "gameReferenceSha256": "3c6d3211a948a528af1d4f813bffa5cc2d3bdddfacbc1a49dd7a29bb3b9deec9",
+  "sourceArtifact": {"id": 11325983924, "sha256": "68fbfc88865708f1e7658ddf8e569d772c5a9e452b8be212de6214f12336bcfe"},
+  "localChecks": {"snapshots": 26, "uiGeometry": 17, "unityProjectGenerator": 5, "contentAndAssets": "passed", "packagingAttempt": "Local full-suite attempt exceeded its execution limit; the complete 64-test success above is from CI, not a claimed local completion."},
+  "runtimeExecution": "not_executed",
+  "gameAcceptanceCases": {"total": 35, "executed": 0},
+  "releaseEligible": false,
+  "notice": "Historical verification record, not current build provenance or release acceptance. Ordinary read-only CI on the final documentation commit is separate evidence. The optional Nebula probe uses a loaded public static getter without a Nebula assembly dependency or network patches. Tests use reflected managed fixtures and actual Harmony detours over harmless methods, not the Nebula runtime. Reference compilation did not launch Unity/DSP, execute real research/production, write game saves, or prove target-game single-player compatibility. Recipes, stable IDs, costs, discovery rules, save formats and existing acceptance statuses are unchanged. No binaries, credentials, private dependency paths or saves are distributed here."
+}
