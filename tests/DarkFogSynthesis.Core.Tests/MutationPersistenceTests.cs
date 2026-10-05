@@ -49,9 +49,10 @@ namespace DarkFogSynthesis.Core.Tests
             var s = Ready(out object id);
             var b = new SessionFailureBoundary(s, () => { }, _ => { }, _ => { });
             int changed = 0;
-            var outer = s.TryBeginPersistence(id)!;
-            var inner = s.TryBeginPersistence(id)!;
+            var outer = s.TryBeginPersistence(id);
+            var inner = s.TryBeginPersistence(id);
             check(outer != null && inner != null, "Nested ordinary saves must remain permitted");
+            if (outer == null || inner == null) throw new InvalidOperationException("Missing nested save leases");
             inner.Dispose(); inner.Dispose();
             check(b.TryMutate(id, () => true, () => changed++, () => { }) == SessionMutationOutcome.Refused && changed == 0,
                 "A nested write released its parent's mutation exclusion");
