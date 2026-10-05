@@ -187,6 +187,12 @@ namespace DarkFogSynthesis.Compatibility
                 button.tips.tipTitle = "dark_fog_synthesis.recipe.dark_fog_matrix.name".Translate();
                 button.tips.tipText = "dark_fog_synthesis.recipe.dark_fog_matrix.description".Translate();
                 bool unlocked = history!.RecipeUnlocked(ProtoIds.DarkFogMatrix.Value);
+                if (!unlocked)
+                {
+                    string technology = (LDB.techs.Select(ProtoIds.InformationTopology.Value)?.Name ??
+                        ProtoIds.StringKey("tech.information_topology.name")).Translate();
+                    button.tips.tipText += "\n" + string.Format("dark_fog_synthesis.lab.requires_technology".Translate(), technology);
+                }
                 if (button.button != null) button.button.interactable = unlocked;
                 icon.color = unlocked ? Color.white : new Color(0.5f, 0.5f, 0.5f, 0.65f);
             }

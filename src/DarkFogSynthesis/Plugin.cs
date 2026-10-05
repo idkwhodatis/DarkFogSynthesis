@@ -50,6 +50,7 @@ namespace DarkFogSynthesis
         private string? fatal => StartupGuardEntrypoints.State.FailureReason;
         private string status = "Experimental build. Gameplay, saves, achievements and integrity are not yet validated. Use an isolated profile and copied saves only.";
         private bool showDiagnostics = true;
+        private float uiCaptureAt = -1f;
         private bool confirmRemoval;
         private bool cleanupCandidate;
         private GUI.WindowFunction? drawDiagnostics;
@@ -228,6 +229,18 @@ namespace DarkFogSynthesis
             catch (Exception pauseError) { Logger.LogError(pauseError); }
         }
 
+        // A single explicit capture request gives the user time to return the pointer to a
+        // hovered/expanded node. No enumeration, hashing or I/O occurs without that request.
+        private void LateUpdate()
+        {
+            if (uiCaptureAt < 0f || UnityEngine.Time.realtimeSinceStartup < uiCaptureAt) return;
+            uiCaptureAt = -1f;
+            try { status = "UI observation saved: " + CompatibilityReport.Export(registry?.Ready == true, Ready,
+                BlockingReason, "manual", GameMain.data, nonPeaceAtStartup, null, UiLayoutCapture.Capture()); }
+            catch (Exception error) { status = "UI observation unavailable."; WarnDiagnostic(error); }
+            showDiagnostics = true;
+        }
+
         private void OnGUI()
         {
             if (!showDiagnostics)
@@ -248,6 +261,11 @@ namespace DarkFogSynthesis
             {
                 try { status = "Diagnostics saved: " + CompatibilityReport.Export(registry?.Ready == true, Ready, BlockingReason, "manual", GameMain.data, nonPeaceAtStartup); Logger.LogInfo(status); }
                 catch (Exception error) { status = "Diagnostic export failed: " + error.Message; Logger.LogError(error); }
+            }
+            if (GUILayout.Button("Capture UI in 3 seconds / 3 秒后采集 UI 边界"))
+            {
+                uiCaptureAt = UnityEngine.Time.realtimeSinceStartup + 3f;
+                showDiagnostics = false;
             }
             if (Ready && GameMain.data != null && !GameMain.isLoading && !cleanupCandidate)
             {

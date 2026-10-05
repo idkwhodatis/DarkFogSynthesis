@@ -39,3 +39,19 @@ python scripts/compare-runtime-snapshots.py a.json b.json --phase equal --output
 ```
 
 The independent oracle includes Titanium Alloy (1107) ×2. Restoration compares with the same session's pre-mode, already-registered baseline, not pre-registration. Existing foreign fallbacks and prerequisites are preserved. Duplicate IDs, missing baselines, malformed caches and differing process/build environments are refused. Exit 0 is only a structural match of exported fields; exit 1 reports drift; exit 2 refuses input. No acceptance flag or save is written. Other mods/framework changes between checkpoints deliberately appear as drift and are not automatically attributed to DFS. Native object-identity checks remain authoritative. Output reports are create-only. No background or production-tick scan was added.
+
+
+## Patch C: native locked feedback and manual rendered bounds
+
+The separate lab choice remains gated by native `RecipeUnlocked`; a locked choice now names the required localized Information Topology research. Both dictionaries have the same extra format key, and Silicon Neuron prose now matches Titanium Alloy x2. No research slot, item discovery flag, native click-index array or gameplay value is changed.
+
+Use the diagnostics window's **Capture UI in 3 seconds / 3 秒后采集 UI 边界** button. The window hides and a single main-thread capture runs after the delay, allowing the pointer to return to a hovered node. This is an explicit one-shot observation, not background polling. Existing lifecycle traces never enumerate UI. The existing manual schema-3 report gains `uiLayout` with screen-space rectangles, ancestor masks, viewport, canvas scale, page grouping, focus value and language. Capture failures remain diagnostics only. Native private UI fields are read through explicit reflection rather than publicized direct access.
+
+```sh
+python scripts/check-ui-layout.py normal.json --kind technology --state normal
+python scripts/check-ui-layout.py hovered.json --kind technology --tech-id 1951 --state hover
+python scripts/check-ui-layout.py expanded.json --kind technology --tech-id 1952 --state expanded
+python scripts/check-ui-layout.py locked-lab.json --kind lab-choice --state locked
+```
+
+The checker refuses absent/partial snapshots and missing/duplicate targets, and reports clipping and same-page/control-group overlaps. Return 0 describes only that observed frame's rectangles, never all languages/scales, pixel visibility, connector clearance or click behavior. Candidate positions and vanilla controls have not been moved: collect real target-game evidence before changing them. Normal/hover/expanded, both languages, supported scales and lab open/close/recreation remain actual game acceptance work. The fixture suite checks geometry and bilingual text only.

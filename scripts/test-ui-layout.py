@@ -68,6 +68,12 @@ class Layout(unittest.TestCase):
             template=data['dark_fog_synthesis.lab.requires_technology']
             self.assertEqual(template.count('{0}'),1)
             self.assertIn('Test Technology',template.format('Test Technology'))
+    def test_silicon_neuron_text_matches_approved_revision(self):
+        root=Path(__file__).resolve().parents[1]
+        for lang,expected,obsolete in [('en-US','2 titanium alloy','particle broadband'),('zh-CN','钛合金 ×2','粒子宽带')]:
+            data=json.loads((root/f'src/DarkFogSynthesis/Localization/Strings.{lang}.json').read_text(encoding='utf-8'))
+            text=data['dark_fog_synthesis.recipe.silicon_neuron.description']
+            self.assertIn(expected,text);self.assertNotIn(obsolete,text)
     def test_cli_create_only(self):
         with tempfile.TemporaryDirectory() as folder:
             p=Path(folder);(p/'in.json').write_text(json.dumps(fixture()))

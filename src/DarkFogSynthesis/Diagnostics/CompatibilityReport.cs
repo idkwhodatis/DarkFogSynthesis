@@ -31,7 +31,7 @@ namespace DarkFogSynthesis.Diagnostics
         }
 
         internal static string Export(bool registered, bool sessionReady, string? error,
-            string stage = "manual", GameData? data = null, bool extendToCombat = false, bool? peaceOverride = null)
+            string stage = "manual", GameData? data = null, bool extendToCombat = false, bool? peaceOverride = null, object? uiLayout = null)
         {
             if (stage == "manual") data = data ?? GameMain.data;
             bool? peace = peaceOverride ?? data?.gameDesc?.isPeaceMode;
@@ -85,7 +85,8 @@ namespace DarkFogSynthesis.Diagnostics
                         nativeItemUnlocked = data.history.ItemUnlocked(r.Output.Item.Value),
                         recordedSpecialDiscovery = data.history.enemyDropItemUnlocked.Contains(r.Output.Item.Value) }).ToArray()
                 },
-                machines = inspectLive ? ObserveMachines(data!) : Array.Empty<object>()
+                machines = inspectLive ? ObserveMachines(data!) : Array.Empty<object>(),
+                uiLayout
             };
             // Serialize the detached snapshot before creating any output file.
             string json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(report);
