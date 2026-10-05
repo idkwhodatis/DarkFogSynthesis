@@ -1,0 +1,82 @@
+name: Integrate approved content adaptation
+on:
+  push:
+    branches: [master]
+    paths: ['scripts/dfs-adaptation-step.py', '.github/workflows/dfs-adaptation.yml']
+permissions:
+  contents: read
+concurrency:
+  group: dfs-approved-content-adaptation
+  cancel-in-progress: false
+jobs:
+  integrate:
+    if: github.repository == 'idkwhodatis/DarkFogSynthesis'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            6.0.428
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install 'Pillow>=10,<13'
+      - name: Apply the explicitly approved bounded change
+        id: change
+        run: python scripts/dfs-adaptation-step.py
+      - name: Core regressions
+        run: dotnet run --project tests/DarkFogSynthesis.Core.Tests -c Release
+      - name: Real Harmony regressions (no DSP)
+        run: |
+          dotnet restore tests/DarkFogSynthesis.Harmony.Tests --locked-mode
+          dotnet run --project tests/DarkFogSynthesis.Harmony.Tests -c Release --no-restore
+      - name: Resources and source content
+        run: |
+          dotnet run --project scripts/ResourceAudit -c Release -- --self-test
+          python scripts/generate-assets.py --check
+          python scripts/validate-content.py
+      - name: Packaging and actual Core build capture
+        run: |
+          python scripts/test-packaging.py
+          python scripts/test-build-capture.py
+          python scripts/test-checkout-assets.py
+      - name: Additional adaptation regression tests
+        run: |
+          if test -f scripts/test-runtime-snapshots.py; then python scripts/test-runtime-snapshots.py; fi
+          if test -f scripts/test-ui-layout.py; then python scripts/test-ui-layout.py; fi
+          git diff --cached --check
+          git diff --check
+      - name: Commit tested changes without overwriting another writer
+        env:
+          COMMIT_MESSAGE: ${{ steps.change.outputs.message }}
+        run: |
+          test -n "$COMMIT_MESSAGE"
+          git fetch origin master
+          test "$(git rev-parse origin/master)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:master
+          echo "Implemented and tested commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Scope: source/Core/Harmony fixtures; no DSP, game saves, online tests, runtime release or deployment.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain source and failure diagnostics (no credentials or build inputs)
+        if: always()
+        run: |
+          mkdir -p /tmp/dfs-adaptation-results
+          git archive --format=zip -o /tmp/dfs-adaptation-results/source.zip HEAD
+          git diff HEAD --binary > /tmp/dfs-adaptation-results/working-tree.patch
+          git log -3 --format='%H %s' > /tmp/dfs-adaptation-results/commits.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dfs-adaptation-source
+          path: /tmp/dfs-adaptation-results/
+          retention-days: 3
