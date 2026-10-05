@@ -8,6 +8,7 @@ using DarkFogSynthesis.Diagnostics;
 using DarkFogSynthesis.Progression;
 using DarkFogSynthesis.Registration;
 using DarkFogSynthesis.Core.Definitions;
+using DarkFogSynthesis.Core.Diagnostics;
 using DarkFogSynthesis.Core.Progression;
 using DarkFogSynthesis.Core.Compatibility;
 using DarkFogSynthesis.Core.Registration;
@@ -45,6 +46,7 @@ namespace DarkFogSynthesis
         private Harmony harmony = null!;
         private ConfigEntry<bool>? nonPeaceSetting;
         private bool nonPeaceAtStartup;
+        private ConfigEntry<bool>? traceSnapshots;
         private string? fatal => StartupGuardEntrypoints.State.FailureReason;
         private string status = "Experimental build. Gameplay, saves, achievements and integrity are not yet validated. Use an isolated profile and copied saves only.";
         private bool showDiagnostics = true;
@@ -65,6 +67,10 @@ namespace DarkFogSynthesis
                     nonPeaceSetting = Config.Bind("Progression", "ApplyCombatPrerequisitesInNonPeaceMode", false,
                         "Also apply the four added combat prerequisites to non-Peace saves. Peace saves always use them. Restart required. / 是否在非和平存档中也启用四项额外战斗前置；和平存档始终启用。修改后重启游戏。");
                     nonPeaceAtStartup = nonPeaceSetting.Value;
+                    // Optional diagnostics cannot prevent startup when their configuration is unavailable.
+                    try { traceSnapshots = Config.Bind("Diagnostics", "TraceSnapshots", false,
+                        "Opt-in phase-labelled prototype snapshots. No game acceptance is implied; restart to capture registration. / 按阶段导出原型诊断，默认关闭。重启以捕获注册阶段。"); }
+                    catch (Exception diagnosticError) { WarnDiagnostic(diagnosticError); }
                     Localization.Strings.Register();
                     harmony = new Harmony(Guid);
                     harmony.PatchAll(typeof(Plugin).Assembly);
@@ -85,6 +91,7 @@ namespace DarkFogSynthesis
             {
                 StartupGuardEntrypoints.State.EnsureInitializationComplete();
                 StartupGuardInstaller.Verify();
+                TraceSnapshot("pre-register");
                 registry.Register();
             }
             catch (Exception error) { Fail(error); throw; }
@@ -100,7 +107,7 @@ namespace DarkFogSynthesis
                 status = "Registered 2 technologies and 6 recipes. This game layout, discovery behavior and save cleanup remain unverified; use copied diagnostic saves only.";
                 Logger.LogInfo(status);
             }, Fail,
-                () => Logger.LogInfo("Runtime diagnostic snapshot: " + CompatibilityReport.Export(registry.Ready, Ready, BlockingReason)),
+                () => Logger.LogInfo("Runtime diagnostic snapshot: " + CompatibilityReport.Export(registry.Ready, Ready, BlockingReason, "post-bind", null, nonPeaceAtStartup)),
                 error => {
                     status += " Automatic diagnostic export failed: " + error.Message;
                     Logger.LogWarning("Content registration succeeded, but automatic diagnostics could not be exported: " + error);
@@ -127,11 +134,33 @@ namespace DarkFogSynthesis
             RuntimeCompatibilityGuard.ValidateSupportedPeers();
         }
 
-        internal void ApplyMode(bool peace)
+        internal void ApplyMode(bool peace, GameData data)
         {
             EnsureRegistryReady();
+            TraceSnapshot("pre-mode", data, peace);
             Progression.Apply(peace, nonPeaceAtStartup);
+            TraceSnapshot("post-mode", data, peace);
             cleanupCandidate = false;
+        }
+
+        internal void RestoreProgression(GameData? data)
+        {
+            Progression?.Restore();
+            TraceSnapshot("post-restore", data);
+        }
+
+        internal void TraceSnapshot(string stage, GameData? data = null, bool? peace = null)
+        {
+            // No exporter, database scan, reflection or file I/O on the disabled path.
+            OptionalDiagnostic.TryCapture(traceSnapshots?.Value == true,
+                () => CompatibilityReport.Export(registry?.Ready == true, Ready, BlockingReason, stage, data, nonPeaceAtStartup, peace),
+                WarnDiagnostic);
+        }
+
+        private void WarnDiagnostic(Exception error)
+        {
+            try { Logger.LogWarning("Optional diagnostic failed: " + error.GetType().Name); }
+            catch (Exception) { } // Reporting failure is never a compatibility failure.
         }
 
         internal void ValidateLoadedMachines(GameData data) => registry.ValidateSavedRecipeCaches(data);
@@ -159,7 +188,7 @@ namespace DarkFogSynthesis
 
         internal void AbortSession(GameData? data, Exception error, Action? cleanup = null)
         {
-            FailureBoundary.Abort(data, error, () => Progression?.Restore(), cleanup ?? (() => { }));
+            FailureBoundary.Abort(data, error, () => RestoreProgression(data), cleanup ?? (() => { }));
         }
 
         internal bool DiagnoseLateConflicts()
@@ -217,7 +246,7 @@ namespace DarkFogSynthesis
             if (nonPeaceSetting != null && nonPeaceSetting.Value != nonPeaceAtStartup) GUILayout.Label("Progression setting changed: restart the game for it to take effect.");
             if (GUILayout.Button("Export runtime diagnostics / 导出运行时诊断"))
             {
-                try { status = "Diagnostics saved: " + CompatibilityReport.Export(registry?.Ready == true, Ready, BlockingReason); Logger.LogInfo(status); }
+                try { status = "Diagnostics saved: " + CompatibilityReport.Export(registry?.Ready == true, Ready, BlockingReason, "manual", GameMain.data, nonPeaceAtStartup); Logger.LogInfo(status); }
                 catch (Exception error) { status = "Diagnostic export failed: " + error.Message; Logger.LogError(error); }
             }
             if (Ready && GameMain.data != null && !GameMain.isLoading && !cleanupCandidate)

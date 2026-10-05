@@ -19,6 +19,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Asset generation or validation failed.' }
     & $Python scripts/validate-content.py
     if ($LASTEXITCODE -ne 0) { throw 'Source content validation failed.' }
+    & $Python scripts/test-runtime-snapshots.py
+    if ($LASTEXITCODE -ne 0) { throw 'Runtime snapshot comparator regressions failed.' }
     & $Python scripts/test-packaging.py
     if ($LASTEXITCODE -ne 0) { throw 'Packaging guard tests failed.' }
     & $DotNet run --project scripts/ResourceAudit/ResourceAudit.csproj --configuration $Configuration -- --self-test

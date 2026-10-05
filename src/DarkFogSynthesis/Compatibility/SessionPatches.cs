@@ -34,7 +34,7 @@ namespace DarkFogSynthesis.Compatibility
         private static void AfterDescriptor(GameDesc __instance)
         {
             if (importing == null || descriptorApplied) return;
-            Plugin.Instance.ApplyMode(__instance.isPeaceMode);
+            Plugin.Instance.ApplyMode(__instance.isPeaceMode, importing);
             sessionPeaceMode = __instance.isPeaceMode;
             descriptorApplied = true;
         }
@@ -77,7 +77,7 @@ namespace DarkFogSynthesis.Compatibility
             }
             catch (Exception error) { Plugin.Instance.RejectSession(__instance, error); throw; }
             __state = true;
-            Plugin.Instance.ApplyMode(_gameDesc.isPeaceMode);
+            Plugin.Instance.ApplyMode(_gameDesc.isPeaceMode, __instance);
             sessionPeaceMode = _gameDesc.isPeaceMode;
         }
 
@@ -111,6 +111,7 @@ namespace DarkFogSynthesis.Compatibility
             __state = Plugin.Instance.BeginSessionValidation(GameMain.data);
             Plugin.Instance.ValidateActiveProgression(GameMain.data);
             Plugin.Instance.ValidateLoadedMachines(GameMain.data);
+            Plugin.Instance.TraceSnapshot("execution-cache-ready", GameMain.data);
             SaveReconciler.Reconcile(GameMain.data.history);
             GameMain.data.history.VerifyTechQueue();
         }
@@ -133,7 +134,11 @@ namespace DarkFogSynthesis.Compatibility
                         SafeRemovalService.OnNewSession(GameMain.data);
                     }, error => Plugin.Instance.AbortSession(GameMain.data, error));
             }
-            finally { Plugin.Instance.EndSessionValidation(__state); }
+            finally
+            {
+                Plugin.Instance.EndSessionValidation(__state);
+                if (Plugin.Instance.Ready) Plugin.Instance.TraceSnapshot("session-ready", GameMain.data);
+            }
         }
 
         private static void BeginTransition(GameData data)
@@ -141,7 +146,7 @@ namespace DarkFogSynthesis.Compatibility
             lock (TransitionLock)
             {
                 if (transition != null) throw new InvalidOperationException("Concurrent/nested game-data initialization is unsupported.");
-                Plugin.Instance.Progression.Restore();
+                Plugin.Instance.RestoreProgression(session);
                 Plugin.Instance.BeginSession(data);
                 transition = data;
                 session = data;
@@ -167,7 +172,7 @@ namespace DarkFogSynthesis.Compatibility
             {
                 // A menu preview or old GameData can be destroyed after another save was prepared.
                 if (!ReferenceEquals(session, data)) return;
-                try { Plugin.Instance.Progression.Restore(); }
+                try { Plugin.Instance.RestoreProgression(data); }
                 catch (Exception error) { Plugin.Instance.RejectSession(data, error); throw; }
                 finally { ClearSession(data); }
             }
