@@ -10,6 +10,7 @@ namespace DarkFogSynthesis.Core.Tests
     {
         internal static void AbortFailures(Action<bool, string> assert)
         {
+            StartupFailureDiagnosticTests.Run(assert);
             foreach (Exception failure in new Exception[] {
                 new InvalidOperationException(""), new InvalidOperationException(" \t\r\n"),
                 new InvalidOperationException("native import failed"), new UnreadableMessageException() })
@@ -51,6 +52,7 @@ namespace DarkFogSynthesis.Core.Tests
 
         internal static void NativeMutationFailures(Action<bool, string> assert)
         {
+            MutationPersistenceTests.Run(assert);
             // Three mutator stages correspond to SetFunction, SyncLabFunctions and SyncLabForceAccMode.
             // These counters test boundary ordering/containment, not those game methods' semantics.
             for (int failingStage = 0; failingStage < 4; failingStage++)
@@ -93,10 +95,12 @@ namespace DarkFogSynthesis.Core.Tests
             }
 
             var successState = new SessionCompatibilityState();
+            var successSession = new object();
+            successState.BeginSession(successSession); successState.CompleteValidatedSession(successSession);
             var successOrder = new List<string>();
             var success = new SessionFailureBoundary(successState, () => successOrder.Add("pause"),
                 _ => successOrder.Add("present"), _ => { successOrder.Add("log"); throw new Exception("logger failed"); });
-            var outcome = success.TryMutate(new object(), () => { successOrder.Add("preflight"); return true; },
+            var outcome = success.TryMutate(successSession, () => { successOrder.Add("preflight"); return true; },
                 () => successOrder.Add("native"), () => successOrder.Add("verified"));
             assert(outcome == SessionMutationOutcome.Completed && successOrder.SequenceEqual(new[] { "preflight", "native", "verified" }),
                 "Successful native completion is verified before returning without any safety side effect.");

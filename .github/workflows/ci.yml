@@ -24,6 +24,10 @@ jobs:
         run: |
           dotnet restore tests/DarkFogSynthesis.Harmony.Tests --locked-mode
           dotnet run --project tests/DarkFogSynthesis.Harmony.Tests -c Release --no-restore
+      - name: Mutation persistence gate through actual Harmony save callbacks
+        run: |
+          dotnet restore tests/DarkFogSynthesis.Persistence.Tests --locked-mode
+          dotnet run --project tests/DarkFogSynthesis.Persistence.Tests -c Release --no-restore
       - name: Regression-test compiled resource audit
         run: dotnet run --project scripts/ResourceAudit -c Release -- --self-test
       - uses: actions/setup-python@v5

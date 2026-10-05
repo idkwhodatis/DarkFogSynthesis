@@ -57,7 +57,18 @@ namespace DarkFogSynthesis.Core.Compatibility
         public void Fail(Exception error)
         {
             if (error == null) throw new ArgumentNullException(nameof(error));
-            System.Threading.Interlocked.CompareExchange(ref failureReason, error.GetType().Name + ": " + error.Message, null);
+            // Close first: even a reentrant/throwing virtual Message getter cannot observe an open
+            // ready gate. Only the winning first failure may enrich its own fallback diagnostic.
+            string fallback = error.GetType().Name + ": startup/content failure; restart the game.";
+            if (System.Threading.Interlocked.CompareExchange(ref failureReason, fallback, null) != null) return;
+            try
+            {
+                string? message = error.Message;
+                if (!string.IsNullOrWhiteSpace(message))
+                    System.Threading.Interlocked.CompareExchange(ref failureReason,
+                        error.GetType().Name + ": " + message, fallback);
+            }
+            catch (Exception) { } // Failure containment never depends on diagnostic getters.
         }
 
         private void EnsureNotFailed()

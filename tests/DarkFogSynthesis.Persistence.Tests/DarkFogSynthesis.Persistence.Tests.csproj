@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The exact 2021 detour dependency crashes on .NET 8. This isolated compatibility
+         harness uses the last .NET 6 runtime; it is not a production runtime upgrade. -->
+    <TargetFramework>net6.0</TargetFramework>
+    <RuntimeFrameworkVersion>6.0.36</RuntimeFrameworkVersion>
+    <RollForward>Disable</RollForward>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/DarkFogSynthesis.Core/DarkFogSynthesis.Core.csproj" />
+    <PackageReference Include="HarmonyX" Version="[2.7.0]" />
+    <PackageReference Include="MonoMod.RuntimeDetour" Version="[21.12.13.1]" />
+    <PackageReference Include="MonoMod.Utils" Version="[21.12.13.1]" />
+    <PackageReference Include="Mono.Cecil" Version="[0.11.4]" />
+  </ItemGroup>
+</Project>

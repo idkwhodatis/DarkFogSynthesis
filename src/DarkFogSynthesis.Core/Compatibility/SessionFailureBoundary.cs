@@ -56,6 +56,9 @@ namespace DarkFogSynthesis.Core.Compatibility
             }
         }
 
+        // The runtime save prefix keeps this exact lease until its paired finalizer runs.
+        public IDisposable? TryBeginPersistence(object? session) => state.TryBeginPersistence(session);
+
         public SessionMutationOutcome TryMutate(object? session, Func<bool> preflight,
             Action mutate, Action verify)
         {
@@ -66,12 +69,15 @@ namespace DarkFogSynthesis.Core.Compatibility
             // Preflight must be read-only. A refusal/failure here has made no native mutation.
             try { if (!preflight()) return SessionMutationOutcome.Refused; }
             catch (Exception error) { Report(error); return SessionMutationOutcome.Refused; }
+            var mutation = state.TryBeginMutation(session);
+            if (mutation == null) return SessionMutationOutcome.Refused;
             try
             {
                 // Even the first native call may throw after changing state. Completion is unknown
                 // until every native call and the whole-stack postcondition have returned normally.
                 mutate();
                 verify();
+                state.EnsureMutationCanComplete(session, mutation);
                 return SessionMutationOutcome.Completed;
             }
             catch (Exception error)
@@ -79,6 +85,7 @@ namespace DarkFogSynthesis.Core.Compatibility
                 Reject(session, error);
                 return SessionMutationOutcome.Blocked;
             }
+            finally { mutation.Dispose(); } // A failure is latched BEFORE the temporary barrier opens.
         }
 
         public void BestEffort(Action action)
