@@ -1,0 +1,120 @@
+name: Verify and commit approved maintenance fixes
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/dfs-maintenance-payload/**'
+      - '.github/dfs-maintenance-smoke.py'
+      - '.github/workflows/dfs-maintenance-fixes.yml'
+permissions:
+  contents: read
+concurrency:
+  group: dfs-approved-maintenance-fixes
+  cancel-in-progress: false
+jobs:
+  fix-and-verify:
+    if: github.repository == 'idkwhodatis/DarkFogSynthesis'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            6.0.428
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install 'Pillow>=10,<13'
+      - name: Apply the exact reviewed changes, refusing unrelated drift
+        run: |
+          python - <<'PY'
+          import gzip, hashlib, subprocess
+          from pathlib import Path
+          subprocess.run(['git','diff','--exit-code','8b43a454e41bb17b6101b6381fbea8770e145f37','HEAD','--','.',':(exclude).github/dfs-maintenance-payload',':(exclude).github/dfs-maintenance-smoke.py',':(exclude).github/workflows/dfs-maintenance-fixes.yml'],check=True)
+          payload=b''.join(Path('.github/dfs-maintenance-payload',f'part{i}').read_bytes() for i in range(3))
+          patch=gzip.decompress(payload)
+          assert hashlib.sha256(patch).hexdigest()=='116f9bf3ec4e2fbe8cb31caf1cb6b3fa5b89cc4cd2a84bbada311a1a89c18ed2'
+          subprocess.run(['git','apply','--check','--index','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          expected={'.github/workflows/ci.yml','docs/compatibility/removal-history-tooling-review.md','scripts/Build.ps1','scripts/compare-runtime-snapshots.py','scripts/prepare-unity-ui-tests.py','scripts/test-runtime-snapshots.py','scripts/test-unity-ui-project.py','src/DarkFogSynthesis.Core/Compatibility/RemovalHistoryGuard.cs','src/DarkFogSynthesis/Compatibility/SafeRemovalService.cs','tests/DarkFogSynthesis.Core.Tests/Program.cs','tests/DarkFogSynthesis.Core.Tests/RemovalHistoryGuardTests.cs','tests/DarkFogSynthesis.Harmony.Tests/Program.cs','tests/DarkFogSynthesis.Unity.Tests/README.md'}
+          actual=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+          assert actual==expected, actual ^ expected
+          PY
+      - name: Core preservation and full existing regressions
+        run: dotnet run --project tests/DarkFogSynthesis.Core.Tests -c Release
+      - name: Actual Harmony callback-boundary regressions (not DSP)
+        run: |
+          dotnet restore tests/DarkFogSynthesis.Harmony.Tests --locked-mode
+          dotnet run --project tests/DarkFogSynthesis.Harmony.Tests -c Release --no-restore
+      - name: Prove missing post-save validation is caught by both suites
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          p=Path('src/DarkFogSynthesis.Core/Compatibility/RemovalHistoryGuard.cs')
+          original=p.read_bytes()
+          old=b'            verifyHistory();\n            save();\n            verifyHistory();'
+          assert original.count(old)==1
+          try:
+              p.write_bytes(original.replace(old,b'            verifyHistory();\n            save();'))
+              for project in ('tests/DarkFogSynthesis.Core.Tests','tests/DarkFogSynthesis.Harmony.Tests'):
+                  result=subprocess.run(['dotnet','run','--project',project,'-c','Release','--no-restore'],capture_output=True,text=True,timeout=180)
+                  assert result.returncode!=0, 'Mutation was not detected: '+project
+                  text=result.stdout+result.stderr
+                  assert 'error CS' not in text and ('Incorrect preservation report' in text or 'Both-side preservation check' in text), text
+                  print('EXPECTED MUTATION REJECTION: '+project)
+          finally:
+              p.write_bytes(original)
+          subprocess.run(['git','diff','--exit-code'],check=True)
+          PY
+      - name: Resources, generated Unity project and diagnostic fixtures
+        run: |
+          dotnet run --project scripts/ResourceAudit -c Release -- --self-test
+          python scripts/generate-assets.py --check
+          python scripts/validate-content.py
+          python scripts/test-runtime-snapshots.py
+          python scripts/test-ui-layout.py
+          python scripts/test-unity-ui-project.py
+      - name: Packaging, genuine build capture and fresh checkouts
+        run: |
+          python scripts/test-packaging.py
+          python scripts/test-build-capture.py
+          python scripts/test-checkout-assets.py
+      - name: Pinned reference compilation and metadata audits (no Unity or DSP execution)
+        run: python .github/dfs-maintenance-smoke.py
+      - name: Commit tested changes and remove the temporary writer
+        run: |
+          git fetch origin master
+          test "$(git rev-parse origin/master)" = "$GITHUB_SHA"
+          git diff --cached --check
+          git diff --check
+          git rm -r .github/dfs-maintenance-payload .github/dfs-maintenance-smoke.py .github/workflows/dfs-maintenance-fixes.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Verify preserved history after candidate saves and fix diagnostic tooling'
+          git push origin HEAD:master
+          echo "Tested code commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Unity/DSP runtime execution, actual disk saves or release approval.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain source and metadata only
+        if: always()
+        run: |
+          mkdir -p /tmp/dfs-maintenance-results
+          git archive --format=zip -o /tmp/dfs-maintenance-results/source.zip HEAD
+          git diff HEAD --binary > /tmp/dfs-maintenance-results/working-tree.patch
+          git log -3 --format='%H %s' > /tmp/dfs-maintenance-results/commits.txt
+          for report in resource-audit.json public-api-audit.json build-report.json; do
+            if test -f artifacts/$report; then cp artifacts/$report /tmp/dfs-maintenance-results/$report; fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dfs-maintenance-fixes-source
+          path: /tmp/dfs-maintenance-results/
+          retention-days: 3
