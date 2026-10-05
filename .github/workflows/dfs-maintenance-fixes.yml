@@ -68,7 +68,8 @@ jobs:
                   result=subprocess.run(['dotnet','run','--project',project,'-c','Release','--no-restore'],capture_output=True,text=True,timeout=180)
                   assert result.returncode!=0, 'Mutation was not detected: '+project
                   text=result.stdout+result.stderr
-                  assert 'error CS' not in text and ('Incorrect preservation report' in text or 'Both-side preservation check' in text), text
+                  expected_failure = ('The callback boundary was not checked on both sides' if project.endswith('Core.Tests') else 'Both-side preservation check')
+                  assert 'error CS' not in text and expected_failure in text, text
                   print('EXPECTED MUTATION REJECTION: '+project)
           finally:
               p.write_bytes(original)
