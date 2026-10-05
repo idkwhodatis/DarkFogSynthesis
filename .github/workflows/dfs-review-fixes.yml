@@ -42,6 +42,15 @@ jobs:
           assert hashlib.sha256(patch).hexdigest()=='ae084cb5a08b58e8ad79f7053b9a8407cf6a380d8ed4b9b3685552842daa1ce2'
           subprocess.run(['git','apply','--check','--index','-'],input=patch,check=True)
           subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          # The full reference build requires a real null guard, not a Require
+          # method whose contract the nullable compiler cannot observe.
+          path=Path('src/DarkFogSynthesis/Progression/RuntimeProgression.cs')
+          old='                var tech = LDB.techs.Select(entry.Key);\n                ContentRegistry.Require(tech != null, "Missing technology with an owned prerequisite cache: " + entry.Key);'
+          new='                var tech = LDB.techs.Select(entry.Key)\n                    ?? throw new InvalidOperationException("Missing technology with an owned prerequisite cache: " + entry.Key);'
+          text=path.read_text(encoding='utf-8')
+          assert text.count(old)==1, 'Native null-guard correction no longer matches'
+          path.write_text(text.replace(old,new),encoding='utf-8')
+          subprocess.run(['git','add',str(path)],check=True)
           expected={'src/DarkFogSynthesis/Progression/RuntimeProgression.cs','src/DarkFogSynthesis.Core/Progression/PrerequisiteCachePolicy.cs','tests/DarkFogSynthesis.Core.Tests/PrerequisiteCachePolicyTests.cs','tests/DarkFogSynthesis.Core.Tests/Program.cs','scripts/compare-runtime-snapshots.py','scripts/test-runtime-snapshots.py','src/DarkFogSynthesis/Diagnostics/UiLayoutCapture.cs','src/DarkFogSynthesis/Diagnostics/RectMaskClipCapture.cs','scripts/check-ui-layout.py','scripts/test-ui-layout.py','scripts/prepare-unity-ui-tests.py','tests/DarkFogSynthesis.Unity.Tests/RectMaskClipCaptureTests.cs','tests/DarkFogSynthesis.Unity.Tests/README.md','docs/compatibility/cache-diagnostics-review.md'}
           actual=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
           assert actual==expected, actual ^ expected
